@@ -15,7 +15,7 @@ using Knet, Statistics, Distributed, Random
 import Base.iterate, Base.length, Knet.minimize!
 
 include("Environment.jl")
-export DEnvironment, Environment
+export Environment
 
 include("Policy.jl")
 export StaticPolicy, RecurrentPolicy
