@@ -64,7 +64,7 @@ function sampletraj(pol::StaticPolicy, env::Environment, rl::PolicyGradientAlgor
 end
 
 function sampletraj(pol::RecurrentPolicy, env::Environment, rl::PolicyGradientAlgorithm)
-    # Prallocate
+    # Preallocate
     X = Array{Float64}(undef, pol.nX, rl.Nsteps)
     U = Array{Float64}(undef, pol.nU, rl.Nsteps)
     r = Array{Float64}(undef, rl.Nsteps)
@@ -75,7 +75,7 @@ function sampletraj(pol::RecurrentPolicy, env::Environment, rl::PolicyGradientAl
     # Sample the trajectory
     for t = 1:rl.Nsteps
         X[:, t] .= xt
-        ut = pol(xt)
+        ut = pol(xt)[1]
         U[:, t] .= ut
         xt, rt = env.dynamics(xt, ut)
         r[t] = rt

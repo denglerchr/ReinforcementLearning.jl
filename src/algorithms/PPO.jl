@@ -76,13 +76,13 @@ end
 
 ## Functions for a static policy
 # First iterate call, producting data that is fed into the forward pass
-function iterate(ppoit::PPOIterator{<:StaticPolicy})
+function iterate(ppoit::PPOIterator{<:P}) where {P<:Policy}
     getnewlossinput!(ppoit, 1)
     return (ppoit.lossinput,), (1, 1)
 end
 
 # first state is the episode number, second state is a counter for ppo, reusing old data to produce yet another gradient
-function iterate(ppoit::PPOIterator{<:StaticPolicy}, state::Tuple{Int, Int})
+function iterate(ppoit::PPOIterator{<:P}, state::Tuple{Int, Int}) where {P<:Policy}
     
     episN = state[1]
     incount = state[2]
@@ -151,32 +151,6 @@ end
 
 
 ## Functions for a recurrent policy
-#
-function iterate(ppoit::PPOIterator{<:RecurrentPolicy})
-    getnewlossinput!(ppoit, 1)  
-    return (ppoit.lossinput,), (1, 1)
-end
-
-# first state is the episode number, second state is a counter for ppo, reusing old data to produce yet another gradient
-function iterate(ppoit::PPOIterator{<:RecurrentPolicy}, state::Tuple{Int, Int})
-    
-    episN = state[1]
-    incount = state[2]
-    # check if we should do another gradient with old data
-    if (ppoit.newepisode[1] == false && incount < 20)
-        print("Epis. $episN , $(incount+1) \u1b[K\r")
-        return (ppoit.lossinput,), (episN, incount+1)
-    end
-
-    ## Pass on to next episode, update lossinput
-    newepisN = episN + 1
-    newepisN > ppoit.rl.Nepisodes && return nothing
-
-    getnewlossinput!(ppoit, newepisN)    
-
-    return (ppoit.lossinput,), (newepisN, 1)
-end
-
 
 # Sample new trajectories, train value function etc etc
 function getnewlossinput!(ppoit::PPOIterator{<:RecurrentPolicy}, episN::Int)
