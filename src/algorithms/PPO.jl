@@ -5,7 +5,7 @@ struct PPO <: PolicyGradientAlgorithm
     Nepisodes::Int # Number of episodes
     gamma::Number # Discount factor
     epsilon::Number # Clipping factor for PPO
-    
+
     # Parameters related to the Value function
     nH::Int # Dimension of the input into the advantage function. Should be env.nX for Markov environments.
     valfunc # Advantage function, should contain Knet.Params to train it
@@ -83,7 +83,7 @@ end
 
 # first state is the episode number, second state is a counter for ppo, reusing old data to produce yet another gradient
 function iterate(ppoit::PPOIterator{<:P}, state::Tuple{Int, Int}) where {P<:Policy}
-    
+
     episN = state[1]
     incount = state[2]
     # check if we should do another gradient with old data
@@ -105,31 +105,31 @@ end
 # Sample new trajectories, train value function etc etc
 function getnewlossinput!(ppoit::PPOIterator{<:StaticPolicy}, episN::Int)
         # Get trajectories
-        print("Epis. $episN , 1 \u1b[K\r")
+        print("Epis. $episN , 1 \r")
         trajvec = gettraj(ppoit.pol, ppoit.env, ppoit.rl)
-    
+
         # Transform the data into big tensors for faster GPU computation
         X, U, r = stacktraj(trajvec, ppoit.pol)
         ppoit.lossinput.X = ppoit.rl.atype(X)
         ppoit.lossinput.U = ppoit.rl.atype(U)
-    
+
         # Train the value function
         valuetrain!(ppoit.rl, X, r)
-    
+
         # Compute the "generalised advantage estimation"
         A = gae(ppoit.rl, X, r)
         ppoit.lossinput.A = ppoit.rl.atype(A)
-    
+
         # Carefull, overwriting r here
         applydiscount!(r, ppoit.rl.gamma)
         meancosts = mean(sum(r, dims = 3))
         ppoit.costvec[episN] = meancosts
         (mod(episN, ppoit.rl.printevery) == 0 || episN == 1) && println("Epis. $episN : mean costs $(meancosts) \u1b[K") # \u1b[K cleans the rest of the line
-    
+
         # Compute the meanU of the (old) policy
         meanUold = ppoit.pol.umean(ppoit.lossinput.X)
         ppoit.lossinput.meanUold = meanUold
-    
+
         # Set other variables
         ppoit.newepisode[1] = false
 

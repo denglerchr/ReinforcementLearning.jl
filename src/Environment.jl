@@ -15,6 +15,6 @@ struct Environment{T}
 
     # Returns/samples the initial state when generating a new trajectory. The call is resetenv!(dynamics).
     # Also use this in the case of a non-Markov environment to reset the hidden state
-    # before sampling a new trajectory. Default is resetenv!(dynamics) = zeros(nX)
+    # before sampling a new trajectory.
     resetenv!::Function
 end

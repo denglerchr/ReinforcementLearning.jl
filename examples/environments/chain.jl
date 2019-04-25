@@ -12,7 +12,7 @@ end
         HeavyChain.simulate!(c.chain, action[1], dt)
     end
     state2 = vcat(c.chain.q[1], c.chain.u[1])
-    xend = HeavyChain.getendpoint(c.chain) # pposition of the bottom of the chain
+    xend = HeavyChain.getendpoint(c.chain) # position of the bottom of the chain
     reward = xend^2
     return state2, reward
 end

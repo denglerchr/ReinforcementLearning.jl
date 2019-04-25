@@ -12,7 +12,6 @@ end
 @everywhere (u::UMEAN)(X) = (U = u.nn(X); return U, u.nn.layers[1].h)
 
 umean = UMEAN( Chain( (Knet.RNN(2, 32; rnnType = :gru, usegpu = false, dataType = eltype(atype), h=0), Dense(32, 1, atype = atype, activation = identity) ) ) )
-#umean = Chain( (GRU(2, 16; atype = atype), Dense(16, 1, atype = atype, activation = identity) ) )
 pol = RecurrentPolicy(2, 32, 1, 0.2, umean, atype, false, nothing, Knet.Adam(), rnn->hiddentozero!(rnn.nn))
 
 # Set up the algorithm
