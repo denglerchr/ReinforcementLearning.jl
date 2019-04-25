@@ -17,12 +17,12 @@ function logpdfgaussian(meanU, U, std::Number)
     N = size(U, 1)
 
     # The normalizing factor of the distribution, after applying the log
-    c = -N/2*log(2*pi*std^2)
+    c = -log(pi*std^2*2)*N/2
 
     # Mean term (3d tensor)
     # Cannot use sum(x->x^2, ..., dims = 1) yet, as AutoGrad doesn support it
     Temp = sum( abs2.(U.-meanU) , dims=1)
-    logpdf = c.-Temp .* (0.5/std^2) 
+    logpdf = c .- Temp ./std^2 ./2
     return logpdf
 end
 

@@ -179,7 +179,7 @@ function getnewlossinput!(ppoit::PPOIterator{<:RecurrentPolicy}, episN::Int)
 
     # Compute the meanU of the (old) policy
     resetpol!(ppoit.pol)
-    meanUold = ppoit.pol.umean(ppoit.lossinput.X)[1]
+    meanUold = umean1(ppoit.pol, ppoit.lossinput.X)
     ppoit.lossinput.meanUold = meanUold
 
     # Set other variables
@@ -189,7 +189,7 @@ function getnewlossinput!(ppoit::PPOIterator{<:RecurrentPolicy}, episN::Int)
 end
 
 
-function ppoloss!(pol::RecurrentPolicy, epsilon::Number, ppoinput::PPOinput)
+function ppoloss!(pol::RecurrentPolicy, epsilon::T, ppoinput::PPOinput) where {T<:Number}
     # Compute the quotient of probabilities pol_new(U)/pol_old(U)
     resetpol!(pol)
     meanUnew = umean1(pol, ppoinput.X)
@@ -199,7 +199,7 @@ function ppoloss!(pol::RecurrentPolicy, epsilon::Number, ppoinput::PPOinput)
     # TODO should probably use new H here and recompute A... (problematic as the backprop though V?) as it is the advantage in state H, which changed
     # or get meanUnew from H, but then X->H will not be trained...
     clipbool = (ppoinput.A .> 0) # 1 where probquot should be clipped at 1-epsilon, 0 if clipping at 1+epsilon
-    probquotclipped = clipbool.*max.(1.0-epsilon, probquot) .+ (1 .- clipbool) .* min.(1.0+epsilon, probquot)
+    probquotclipped = clipbool.*max.(1-epsilon, probquot) .+ (1 .- clipbool) .* min.(1 + epsilon, probquot)
 
     # return the mean of the product, which is what is minimized here (usually called "L")
     return mean(probquotclipped.*ppoinput.A)
