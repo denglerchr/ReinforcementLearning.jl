@@ -48,7 +48,8 @@ function iterate(rlit::ReinforceIterator)
     # Transform the data into big tensors for faster GPU computation
     X, U, r = stacktraj(trajvec, rlit.pol)
     applydiscount!(r, rlit.rl.gamma)
-    return (X, U, r, 1, true), 1
+    atype = rlit.pol.atype
+    return (atype(X), atype(U), atype(r), 1, true), 1
 end
 
 function iterate(rlit::ReinforceIterator, episodeN::Int)
@@ -65,7 +66,8 @@ function iterate(rlit::ReinforceIterator, episodeN::Int)
     trajvec = gettraj(rlit.pol, rlit.env, rlit.rl)
     X, U, r = stacktraj(trajvec, rlit.pol)
     applydiscount!(r, rlit.rl.gamma)
-    return (X, U, r, newepisN, printbool), newepisN
+    atype = rlit.pol.atype
+    return (atype(X), atype(U), atype(r), newepisN, printbool), newepisN
 end
 
 length(it::ReinforceIterator) = it.rl.Nepisodes
@@ -95,7 +97,7 @@ function logpdfr!(pol::Policy, baseline::Symbol, X::T, U::T, r::T, episN::Int, p
 
     # Print if requested
     printbool && println("Epis. $episN: mean costs: $meanR")
-    
+
     # Return the mean of the product, no baseline applied
     return mean(R .* p)
 
