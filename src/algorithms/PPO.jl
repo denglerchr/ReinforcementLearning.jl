@@ -136,23 +136,7 @@ function getnewlossinput!(ppoit::PPOIterator{<:StaticPolicy}, episN::Int)
         return 1
 end
 
-function ppoloss!(pol::StaticPolicy, epsilon::Number, ppoinput::PPOinput)
-    # Compute the quotient of probabilities pol_new(U)/pol_old(U)
-    meanUnew = pol.umean(ppoinput.X)
-    probquot = pdfgaussianquot(meanUnew, ppoinput.meanUold, ppoinput.U, pol.std, pol.std)
-
-    # Set gradient to zero for quotient too far from 1
-    clipbool = (ppoinput.A .> 0) # 1 where probquot should be clipped at 1-epsilon, 0 if clipping at 1+epsilon
-    probquotclipped = clipbool.*max.(1.0-epsilon, probquot) .+ (1 .- clipbool) .* min.(1.0+epsilon, probquot)
-
-    # return the mean of the product, which is what is minimized here (usually called "L")
-    return mean(probquotclipped.*ppoinput.A)
-end
-
-
-## Functions for a recurrent policy
-
-# Sample new trajectories, train value function etc etc
+# Sample new trajectories, train value function etc etc (version for Recurrent Policies)
 function getnewlossinput!(ppoit::PPOIterator{<:RecurrentPolicy}, episN::Int)
     # Get trajectories
     print("Epis. $episN , 1 \r")
@@ -189,17 +173,16 @@ function getnewlossinput!(ppoit::PPOIterator{<:RecurrentPolicy}, episN::Int)
 end
 
 
-function ppoloss!(pol::RecurrentPolicy, epsilon::T, ppoinput::PPOinput) where {T<:Number}
+# The loss function of PPO
+function ppoloss!(pol::Policy, epsilon::T, ppoinput::PPOinput) where {T<:Number}
     # Compute the quotient of probabilities pol_new(U)/pol_old(U)
     resetpol!(pol)
     meanUnew = umean1(pol, ppoinput.X)
-    probquot = pdfgaussianquot(meanUnew, ppoinput.meanUold, ppoinput.U, pol.std, pol.std)
+    probquot = pdfgaussianquot_limited(meanUnew, ppoinput.meanUold, ppoinput.U, pol.std, pol.std, T(1e4))
 
     # Set gradient to zero for quotient too far from 1
-    # TODO should probably use new H here and recompute A... (problematic as the backprop though V?) as it is the advantage in state H, which changed
-    # or get meanUnew from H, but then X->H will not be trained...
     clipbool = (ppoinput.A .> 0) # 1 where probquot should be clipped at 1-epsilon, 0 if clipping at 1+epsilon
-    probquotclipped = clipbool.*max.(1-epsilon, probquot) .+ (1 .- clipbool) .* min.(1 + epsilon, probquot)
+    probquotclipped = clipbool.*max.(one(T)-epsilon, probquot) .+ (1 .- clipbool) .* min.(one(T) + epsilon, probquot)
 
     # return the mean of the product, which is what is minimized here (usually called "L")
     return mean(probquotclipped.*ppoinput.A)
