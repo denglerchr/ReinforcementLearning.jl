@@ -7,7 +7,7 @@ include("../environments/mountaincar.jl")
 atype = Array{Float64}
 umean = Chain( (Dense(2, 16; atype = atype, activation = tanh), Dense(16, 1, atype = atype, activation = identity) ) )
 
-pol = StaticPolicy(2, 1, 1.0, x->umean(x), atype, false, nothing, Knet.Adam())
+pol = StaticPolicy(2, 1, 0.1, x->umean(x), atype, false, nothing, Knet.Adam())
 
 # Set up the algorithm
 alg = Reinforce(10, 500, 500, 1.0, :mean, 50, default_worker_pool())

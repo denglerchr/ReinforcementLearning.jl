@@ -27,4 +27,4 @@ end
 
 @everywhere movecar(x::AbstractVector, u::AbstractVector) = movecar(x, u[1])
 
-env = Environment(1, 2, movecar, x->[-pi/6+randn()*0.001, 0.0])
+env = Environment(1, 2, movecar, x->[-pi/6+randn()*0.01, 0.0])
