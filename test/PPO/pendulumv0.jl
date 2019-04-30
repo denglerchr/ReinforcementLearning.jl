@@ -16,7 +16,7 @@ valfunc = Chain( (Dense(2, 16; atype = atype, activation = tanh), Dense(16, 16; 
 alg = PPO(200, 500, 10, 0.99, 0.05, 2, valfunc, atype, usegpu, Knet.Adam(), :MC, 0.3, 50, default_worker_pool())
 
 # Create and plot some trajectories
-sometraj = ReinforcementLearning.gettraj(pol, env::Environment, alg)
+sometraj = ReinforcementLearning.gettraj(pol, env, alg)
 
 plotind = rand(1:length(sometraj))
 #=
@@ -44,7 +44,8 @@ A = ReinforcementLearning.gae(alg, X, r)
 A = alg.atype(A)
 
 # Compute the mean of the old policy
-meanUold = pol.umean(pol.atype(X))
+ReinforcementLearning.resetpol!(pol)
+meanUold = ReinforcementLearning.umean1(pol, pol.atype(X))
 #=
 plot(U[:, plotind, :]')
 plot!(meanUold[:, plotind, :]')
