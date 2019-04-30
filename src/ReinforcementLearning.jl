@@ -24,7 +24,6 @@ export StaticPolicy, RecurrentPolicy
 include("RLAlgorithm.jl")
 include("Trajectory.jl")
 include("algorithms/Reinforce.jl")
-
 export Reinforce
 export minimize!
 
@@ -32,5 +31,8 @@ include("algorithms/PPO.jl")
 include("valuefunc.jl")
 include("gae.jl")
 export PPO
+
+include("algorithms/Experimental.jl")
+export Experimental
 
 end
