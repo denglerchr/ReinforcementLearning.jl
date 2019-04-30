@@ -63,7 +63,7 @@ function minimize!(rl::PPO, pol::Policy, env::Environment)
         (loss, state) = next
         if (loss>=oldloss)
             newepcount += 1
-            newepcount>3 && (expit.newepisode[1] = true; newepcount = 0; oldloss=Inf)
+            newepcount>3 && (ppoit.newepisode[1] = true; newepcount = 0; oldloss=Inf)
         else
             oldloss = loss
         end
