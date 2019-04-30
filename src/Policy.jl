@@ -23,7 +23,7 @@ struct RecurrentPolicy{T} <: Policy
     umean::T # Callable object, returns the mean of the gaussian policy. Is called as umean(x).
     atype::Type # Type of the Arrays used in umean (input will be cast to that same type). E.g. Array{Float32}
     usegpu::Bool # Should be true if the umean is trained on a GPU, false if only CPU.
-    converttocpu # if the gpu is being used for training, this function must produce a version of umean that can be evaluate on the cpu 
+    converttocpu # if the gpu is being used for training, this function must produce a version of umean that can be evaluate on the cpu
     optimizer  # The optimizer, e.g. Knet.Adam()
 
     # This function is called as resetpolicy!(umean) on the "cpu policy" to
@@ -74,6 +74,12 @@ end
 (pol::StaticPolicy)(x::AbstractVector) =  umean1(pol, x) .+ pol.std*randn(pol.nU)
 
 function (pol::RecurrentPolicy)(x::AbstractVector)
+    umean, h = pol.umean(x)
+    u = umean .+ pol.std*randn(pol.nU)
+    return u
+end
+
+function samplepolh(pol::RecurrentPolicy, x)
     umean, h = pol.umean(x)
     u = umean .+ pol.std*randn(pol.nU)
     return u, h
