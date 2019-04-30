@@ -2,14 +2,16 @@
 function gae(rl::PolicyGradientAlgorithm, X, r)
     # Compute the value function
     @assert (rl.nH == size(X, 1))
+    cputype = eltype(X)
+
     nTraj = size(X, 2)
     nsteps = size(X, 3)
-    V = Array{Float64}( rl.valfunc(rl.atype(X)) )
+    V = Array{cputype}( rl.valfunc(rl.atype(X)) )
 
     # Compute the advantage
-    A = Array{Float64}(undef, size(V))
-    delta_V = Array{Float64}(undef, nTraj)
-    delta_V1 = Array{Float64}(undef, nTraj)
+    A = Array{cputype}(undef, size(V))
+    delta_V = Array{cputype}(undef, nTraj)
+    delta_V1 = Array{cputype}(undef, nTraj)
     fill!(A, 0)
     fill!(delta_V, 0)
     fill!(delta_V1, 0)
