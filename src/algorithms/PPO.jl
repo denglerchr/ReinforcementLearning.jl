@@ -55,7 +55,7 @@ function minimize!(rl::PPO, pol::Policy, env::Environment)
     ppoit = PPOIterator(env, pol, rl, ppores, costvec, [true])
 
     # Compute gradient using backprop and apply gradient
-    optiter = Knet.minimize(lossfun, ppoit, pol.optimizer) # TODO create iterator, which produces the XUr tuple...
+    optiter = Knet.minimize(lossfun, ppoit, pol.optimizer)
     next = iterate(optiter)
     oldloss = Inf
     newepcount = 0 # increases when the loss increases. Sample new trajectories after newepcount=3
@@ -63,8 +63,7 @@ function minimize!(rl::PPO, pol::Policy, env::Environment)
         (loss, state) = next
         if (loss>=oldloss)
             newepcount += 1
-            newepcount>3 && (ppoit.newepisode[1] = true; newepcount = 0)
-            oldloss = Inf
+            newepcount>3 && (expit.newepisode[1] = true; newepcount = 0; oldloss=Inf)
         else
             oldloss = loss
         end
