@@ -22,7 +22,7 @@ function gettraj(pol::Policy, env::Environment, rl::PolicyGradientAlgorithm)
     else
         g = x -> sampletraj(pol, env, rl)
     end
-    
+
     bs = ceil(Int, rl.Ntraj/max(length(rl.workerpool), 1))
     return pmap(g, rl.workerpool, 1:rl.Ntraj; batch_size = bs)
 end
@@ -35,50 +35,31 @@ function gettrajh(pol::RecurrentPolicy, env::Environment, rl::PolicyGradientAlgo
     else
         g = x -> sampletrajh(pol, env, rl)
     end
-    
+
     bs = ceil(Int, rl.Ntraj/max(length(rl.workerpool), 1))
     return pmap(g, rl.workerpool, 1:rl.Ntraj; batch_size = bs)
 end
 
 
-# Sample a trajectory, this is always evaluated on a Cpu so far
-function sampletraj(pol::StaticPolicy, env::Environment, rl::PolicyGradientAlgorithm)
-    # Prallocate
-    X = Array{Float64}(undef, pol.nX, rl.Nsteps)
-    U = Array{Float64}(undef, pol.nU, rl.Nsteps)
-    r = Array{Float64}(undef, rl.Nsteps)
+function sampletraj(pol::Policy, env::Environment, rl::PolicyGradientAlgorithm)
+    # Preallocate
+    cputype = eltype(pol.atype)
+    X = Array{cputype}(undef, pol.nX, rl.Nsteps)
+    U = Array{cputype}(undef, pol.nU, rl.Nsteps)
+    r = Array{cputype}(undef, rl.Nsteps)
+    xt = Array{cputype}(undef, pol.nX)
 
-    xt = env.resetenv!(env.dynamics)
+    xt .= env.resetenv!(env.dynamics)
+    resetpol!(pol)
 
     # Sample the trajectory
     for t = 1:rl.Nsteps
         X[:, t] .= xt
         ut = pol(xt)
         U[:, t] .= ut
-        xt, rt = env.dynamics(xt, ut)
-        r[t] = rt
-    end
-
-    # Return a Trajectory struct
-    return Trajectory(X, U, r)
-end
-
-function sampletraj(pol::RecurrentPolicy, env::Environment, rl::PolicyGradientAlgorithm)
-    # Preallocate
-    X = Array{Float64}(undef, pol.nX, rl.Nsteps)
-    U = Array{Float64}(undef, pol.nU, rl.Nsteps)
-    r = Array{Float64}(undef, rl.Nsteps)
-
-    xt = env.resetenv!(env.dynamics)
-    resetpol!(pol)
-
-    # Sample the trajectory
-    for t = 1:rl.Nsteps
-        X[:, t] .= xt
-        ut = pol(xt)[1]
-        U[:, t] .= ut
-        xt, rt = env.dynamics(xt, ut)
-        r[t] = rt
+        simres = env.dynamics(xt, ut)
+        xt .= simres[1]
+        r[t] = simres[2]
     end
 
     # Return a Trajectory struct
@@ -89,10 +70,11 @@ end
 # Sample a trajectory, also saving the hidden states
 function sampletrajh(pol::RecurrentPolicy, env::Environment, rl::PolicyGradientAlgorithm)
     # Prallocate
-    X = Array{Float64}(undef, pol.nX, rl.Nsteps)
-    H = Array{Float64}(undef, pol.nH, rl.Nsteps)
-    U = Array{Float64}(undef, pol.nU, rl.Nsteps)
-    r = Array{Float64}(undef, rl.Nsteps)
+    cputype = eltype(pol.atype)
+    X = Array{cputype}(undef, pol.nX, rl.Nsteps)
+    H = Array{cputype}(undef, pol.nH, rl.Nsteps)
+    U = Array{cputype}(undef, pol.nU, rl.Nsteps)
+    r = Array{cputype}(undef, rl.Nsteps)
 
     xt = env.resetenv!(env.dynamics)
     resetpol!(pol)
@@ -100,7 +82,7 @@ function sampletrajh(pol::RecurrentPolicy, env::Environment, rl::PolicyGradientA
     # Sample the trajectory
     for t = 1:rl.Nsteps
         X[:, t] .= xt
-        ut, ht = pol(xt)
+        ut, ht = samplepolh(pol, xt)
         U[:, t] .= ut
         H[:, t] .= ht
         xt, rt = env.dynamics(xt, ut)
@@ -114,9 +96,10 @@ end
 
 # Bring trajectories of same length into a 3d tensor shape, appropriate for calling neural networks
 function stacktraj(trajvec::Vector{Trajectory}, pol)
-    X = Array{Float64}(undef, pol.nX, length(trajvec), size(trajvec[1].X, 2))
-    U = Array{Float64}(undef, pol.nU, length(trajvec), size(trajvec[1].U, 2))
-    r = Array{Float64}(undef, 1, length(trajvec), length(trajvec[1].r))
+    cputype = eltype(pol.atype)
+    X = Array{cputype}(undef, pol.nX, length(trajvec), size(trajvec[1].X, 2))
+    U = Array{cputype}(undef, pol.nU, length(trajvec), size(trajvec[1].U, 2))
+    r = Array{cputype}(undef, 1, length(trajvec), length(trajvec[1].r))
     for (i, traj) in enumerate(trajvec)
         X[:, i, :] .= traj.X
         U[:, i, :] .= traj.U
@@ -127,10 +110,11 @@ end
 
 
 function stacktrajh(trajvec::Vector{TrajectoryH}, pol)
-    X = Array{Float64}(undef, pol.nX, length(trajvec), size(trajvec[1].X, 2))
-    H = Array{Float64}(undef, pol.nH, length(trajvec), size(trajvec[1].H, 2))
-    U = Array{Float64}(undef, pol.nU, length(trajvec), size(trajvec[1].U, 2))
-    r = Array{Float64}(undef, 1, length(trajvec), length(trajvec[1].r))
+    cputype = eltype(pol.atype)
+    X = Array{cputype}(undef, pol.nX, length(trajvec), size(trajvec[1].X, 2))
+    H = Array{cputype}(undef, pol.nH, length(trajvec), size(trajvec[1].H, 2))
+    U = Array{cputype}(undef, pol.nU, length(trajvec), size(trajvec[1].U, 2))
+    r = Array{cputype}(undef, 1, length(trajvec), length(trajvec[1].r))
     for (i, traj) in enumerate(trajvec)
         X[:, i, :] .= traj.X
         H[:, i, :] .= traj.H
