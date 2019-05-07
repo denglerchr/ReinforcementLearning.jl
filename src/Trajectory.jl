@@ -95,6 +95,7 @@ end
 
 
 # Bring trajectories of same length into a 3d tensor shape, appropriate for calling neural networks
+# Functions with 2 arguments stack the whole trajectory, 3 arguments can be used for slicing sequences
 function stacktraj(trajvec::Vector{Trajectory}, pol::Policy)
     cputype = eltype(pol.atype)
     X = Array{cputype}(undef, pol.nX, length(trajvec), size(trajvec[1].X, 2))
@@ -131,15 +132,15 @@ function stacktrajh(trajvec::Vector{TrajectoryH}, pol::Policy, seqlength::Int)
     H = Array{cputype}(undef, pol.nH, nseq, seqlength)
     U = Array{cputype}(undef, pol.nU, nseq, seqlength)
     r = Array{cputype}(undef, 1, nseq, seqlength)
-    i = 1 # Index of the cutted sequences
+    i = 0 # Index of the cutted sequences
     for traj in trajvec
         startindex = 1
         while (startindex+seqlength-1) <= size(traj.X, 2)
+            i += 1
             X[:, i, :] .= traj.X[:, startindex:startindex+seqlength-1]
             H[:, i, :] .= traj.H[:, startindex:startindex+seqlength-1]
             U[:, i, :] .= traj.U[:, startindex:startindex+seqlength-1]
             r[1, i, :] .= traj.r[startindex:startindex+seqlength-1]
-            i += 1
             startindex += seqlength
         end
     end
@@ -147,6 +148,64 @@ function stacktrajh(trajvec::Vector{TrajectoryH}, pol::Policy, seqlength::Int)
     return X, H, U, r
 end
 
+## Functions, stacking only some variables
+function stackXr(trajvec::Vector{T}, pol::Policy) where {T<:Union{Trajectory, TrajectoryH}}
+    cputype = eltype(pol.atype)
+    X = Array{cputype}(undef, pol.nX, length(trajvec), size(trajvec[1].X, 2))
+    r = Array{cputype}(undef, 1, length(trajvec), length(trajvec[1].r))
+    for (i, traj) in enumerate(trajvec)
+        X[:, i, :] .= traj.X
+        r[1, i, :] .= traj.r
+    end
+    return X, r
+end
+
+function stackHr(trajvec::Vector{TrajectoryH}, pol::Policy)
+    cputype = eltype(pol.atype)
+    H = Array{cputype}(undef, pol.nH, length(trajvec), size(trajvec[1].H, 2))
+    r = Array{cputype}(undef, 1, length(trajvec), length(trajvec[1].r))
+    for (i, traj) in enumerate(trajvec)
+        H[:, i, :] .= traj.H
+        r[1, i, :] .= traj.r
+    end
+    return H, r
+end
+
+function stackXU(trajvec::Vector{T}, pol::Policy, seqlength::Int) where {T<:Union{Trajectory, TrajectoryH}}
+    cputype = eltype(pol.atype)
+    nseq = sum( floor(Int, size(traj.X, 2)/seqlength ) for traj in trajvec )
+    X = Array{cputype}(undef, pol.nX, nseq, seqlength)
+    U = Array{cputype}(undef, pol.nU, nseq, seqlength)
+    i = 0 # Index of the cutted sequences
+    for traj in trajvec
+        startindex = 1
+        while (startindex+seqlength-1) <= size(traj.X, 2)
+            i += 1
+            X[:, i, :] .= traj.X[:, startindex:startindex+seqlength-1]
+            U[:, i, :] .= traj.U[:, startindex:startindex+seqlength-1]
+            startindex += seqlength
+        end
+    end
+    @assert(i==nseq)
+    return X, U
+end
+
+# Slice tensor the same way as trajectories above
+function sliceseq(M::Array{T, 3}, seqlength::Int) where {T<:Number}
+    nseq = size(M, 2)*floor(Int, size(M, 3)/seqlength )
+    Out = similar(M, size(M, 1), nseq, seqlength)
+    i = 0 # Index of the cutted sequences
+    for traj = 1:size(M, 2)
+        startindex = 1
+        while (startindex+seqlength-1) <= size(M, 3)
+            i += 1
+            Out[:, i, :] .= M[:, traj, startindex:startindex+seqlength-1]
+            startindex += seqlength
+        end
+    end
+    @assert(i==nseq)
+    return Out
+end
 
 # Apply the discount factor to the 3d tensor "r" where t is in the 3rd dimension
 function applydiscount!(r, gamma)

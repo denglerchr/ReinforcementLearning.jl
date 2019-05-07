@@ -165,7 +165,10 @@ function getnewdata!(ppoit::PPOIterator{<:RecurrentPolicy}, episN::Int)
     trajvec = gettrajh(ppoit.pol, ppoit.env, ppoit.rl)
 
     # Transform the data into big tensors for faster GPU computation
-    X, H, U, r = stacktrajh(trajvec, ppoit.pol, pol.seqlength)
+    # Also cut X and U in shorter sequences
+    # Leave H and r in long sequences, to have correct computation of the advantage
+    X, U = stackXU(trajvec, ppoit.pol, ppoit.pol.seqlength)
+    H, r = stackHr(trajvec, ppoit.pol)
     ppoit.alldata.X = X
     ppoit.alldata.U = U
 
@@ -179,7 +182,7 @@ function getnewdata!(ppoit::PPOIterator{<:RecurrentPolicy}, episN::Int)
 
     # Compute the "generalised advantage estimation"
     A = gae(ppoit.rl, H, r)
-    ppoit.alldata.A = A
+    ppoit.alldata.A = sliceseq(A, ppoit.pol.seqlength)
 
     # Carefull, overwriting r here
     applydiscount!(r, ppoit.rl.gamma)
