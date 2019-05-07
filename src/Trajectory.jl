@@ -95,7 +95,7 @@ end
 
 
 # Bring trajectories of same length into a 3d tensor shape, appropriate for calling neural networks
-function stacktraj(trajvec::Vector{Trajectory}, pol)
+function stacktraj(trajvec::Vector{Trajectory}, pol::Policy)
     cputype = eltype(pol.atype)
     X = Array{cputype}(undef, pol.nX, length(trajvec), size(trajvec[1].X, 2))
     U = Array{cputype}(undef, pol.nU, length(trajvec), size(trajvec[1].U, 2))
@@ -109,7 +109,7 @@ function stacktraj(trajvec::Vector{Trajectory}, pol)
 end
 
 
-function stacktrajh(trajvec::Vector{TrajectoryH}, pol)
+function stacktrajh(trajvec::Vector{TrajectoryH}, pol::Policy)
     cputype = eltype(pol.atype)
     X = Array{cputype}(undef, pol.nX, length(trajvec), size(trajvec[1].X, 2))
     H = Array{cputype}(undef, pol.nH, length(trajvec), size(trajvec[1].H, 2))
@@ -121,6 +121,29 @@ function stacktrajh(trajvec::Vector{TrajectoryH}, pol)
         U[:, i, :] .= traj.U
         r[1, i, :] .= traj.r
     end
+    return X, H, U, r
+end
+
+function stacktrajh(trajvec::Vector{TrajectoryH}, pol::Policy, seqlength::Int)
+    cputype = eltype(pol.atype)
+    nseq = sum( floor(Int, size(traj.X, 2)/seqlength ) for traj in trajvec )
+    X = Array{cputype}(undef, pol.nX, nseq, seqlength)
+    H = Array{cputype}(undef, pol.nH, nseq, seqlength)
+    U = Array{cputype}(undef, pol.nU, nseq, seqlength)
+    r = Array{cputype}(undef, 1, nseq, seqlength)
+    i = 1 # Index of the cutted sequences
+    for traj in trajvec
+        startindex = 1
+        while (startindex+seqlength-1) <= size(traj.X, 2)
+            X[:, i, :] .= traj.X[:, startindex:startindex+seqlength-1]
+            H[:, i, :] .= traj.H[:, startindex:startindex+seqlength-1]
+            U[:, i, :] .= traj.U[:, startindex:startindex+seqlength-1]
+            r[1, i, :] .= traj.r[startindex:startindex+seqlength-1]
+            i += 1
+            startindex += seqlength
+        end
+    end
+    @assert(i==nseq)
     return X, H, U, r
 end
 
