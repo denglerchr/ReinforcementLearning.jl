@@ -32,7 +32,7 @@ function minimize!(rl::Reinforce, pol::Policy, env::Environment)
     rlit = ReinforceIterator(env, pol, rl)
 
     # Compute gradient using backprop and apply gradient
-    Knet.minimize!(loss, rlit, pol.optimizer) # TODO create iterator, which produces the XUr tuple...
+    Knet.minimize!(loss, rlit, pol.optimizer)
 
     return costvec
 end
@@ -100,5 +100,4 @@ function logpdfr!(pol::Policy, baseline::Symbol, X::T, U::T, r::T, episN::Int, p
 
     # Return the mean of the product, no baseline applied
     return mean(R .* p)
-
 end
