@@ -24,7 +24,7 @@ alg = PPO(50, 500, 2, 0.99, 0.05, 50, 16, valfunc, atype, usegpu, Knet.Adam(), :
 ReinforcementLearning.checkconsistency(alg, pol, env)
 
 # Create and plot some trajectories
-sometraj = ReinforcementLearning.gettrajh(pol, env::Environment, alg)
+sometraj = ReinforcementLearning.gettrajh(pol, env, alg)
 
 plotind = rand(1:length(sometraj))
 #=
