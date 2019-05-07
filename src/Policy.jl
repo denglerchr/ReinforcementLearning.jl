@@ -25,6 +25,7 @@ struct RecurrentPolicy{T} <: Policy
     usegpu::Bool # Should be true if the umean is trained on a GPU, false if only CPU.
     converttocpu # if the gpu is being used for training, this function must produce a version of umean that can be evaluate on the cpu
     optimizer  # The optimizer, e.g. Knet.Adam()
+    seqlength::Int # Sequence length, used for backprop through time
 
     # This function is called as resetpolicy!(umean) on the "cpu policy" to
     # reset the hidden state of the policy (e.g. set hidden state to zero)

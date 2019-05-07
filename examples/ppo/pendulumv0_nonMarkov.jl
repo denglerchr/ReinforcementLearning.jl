@@ -4,8 +4,8 @@
 include("../environments/pendulumv0_nonMarkov.jl")
 
 # Create a static policy as a simple fully connected NN
-atype = KnetArray{Float32}
-usegpu = true
+atype = (Knet.gpu() == -1 ? Array{Float32} : KnetArray{Float32})
+usegpu = (Knet.gpu() != -1)
 @everywhere struct UMEAN # wrapper for returning also the hidden state
     nn::Chain
 end
@@ -17,14 +17,14 @@ function convertumean(umeanin)
 end
 
 umean = UMEAN( Chain( (Knet.RNN(1, 16; rnnType = :gru, usegpu = usegpu, dataType = eltype(atype), h=0), Dense(16, 1, atype = atype, activation = identity) ) ) )
-pol = RecurrentPolicy(1, 16, 1, 0.02, umean, atype, usegpu, convertumean , Knet.SGD(;lr=0.001), rnn->hiddentozero!(rnn.nn))
+pol = RecurrentPolicy(1, 16, 1, 0.02, umean, atype, usegpu, convertumean , Knet.SGD(;lr=0.001), 100, rnn->hiddentozero!(rnn.nn))
 
 
 # Define a value function, we use a neural network again
 valfunc = Chain( (Dense(16, 64; atype = atype, activation = tanh), Dense(64, 32; atype = atype, activation = tanh), Dense(32, 1, atype = atype, activation = identity) ) )
 
 # Set up the algorithm
-alg = PPO(5000, 500, 500, 0.99, 0.05, 16, valfunc, atype, usegpu, Knet.SGD(), :MC, 0.05, 2, default_worker_pool())
+alg = PPO(1000, 500, 500, 0.99, 0.05, 512, 16, valfunc, atype, usegpu, Knet.SGD(), :MC, 0.05, 2, default_worker_pool())
 
 # Start training
 all_costs = minimize!(alg, pol, env)

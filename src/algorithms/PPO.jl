@@ -5,6 +5,7 @@ struct PPO <: PolicyGradientAlgorithm
     Nepisodes::Int # Number of episodes
     gamma::Number # Discount factor
     epsilon::Number # Clipping factor for PPO
+    batchsize::Int # Number of trajectories used to compute one alternative loss
 
     # Parameters related to the Value function
     nH::Int # Dimension of the input into the advantage function. Should be env.nX for Markov environments.
@@ -20,10 +21,17 @@ struct PPO <: PolicyGradientAlgorithm
 end
 
 
-# This is used to return multiple times the same data while iterating
-mutable struct PPOinput{T}
+# Contains one data batch, used to compute the ppo loss
+struct PPOinput{T}
     X::T
-    H::T # is not used in case of a static policy
+    U::T
+    meanUold::T
+    A::T
+end
+
+# Contains trajectory data as tensors (always on the cpu)
+mutable struct PPOdata{T}
+    X::T
     U::T
     meanUold::T
     A::T
@@ -34,7 +42,7 @@ struct PPOIterator{P<:Policy}
     env::Environment
     pol::P
     rl::PPO
-    lossinput::PPOinput
+    alldata::PPOdata # save all data of one iteration
     costvec::Vector{Float64}
     newepisode::Vector{Bool}
 end
@@ -42,17 +50,14 @@ end
 
 # The main call, starting the rl optimization
 function minimize!(rl::PPO, pol::Policy, env::Environment)
-    @assert pol.nX == env.nX
-    @assert pol.nU == env.nU
-    @assert pol.usegpu == rl.usegpu
-    @assert pol.atype == rl.atype
-
+    checkconsistency(rl, pol, env)
+    cputype = eltype(pol.atype)
     costvec = [NaN for i = 1:rl.Nepisodes]
 
     # Define loss and batch generator
     lossfun(ppoinput) = ppoloss!(pol, rl.epsilon, ppoinput)
-    ppores = PPOinput(pol.atype(zeros(1, 1, 1)), pol.atype(zeros(1, 1, 1)), pol.atype(zeros(1, 1, 1)), pol.atype(zeros(1, 1, 1)), pol.atype(zeros(1, 1, 1)))
-    ppoit = PPOIterator(env, pol, rl, ppores, costvec, [true])
+    ppodata = PPOdata(zeros(cputype, 1, 1, 1), zeros(cputype, 1, 1, 1), zeros(cputype, 1, 1, 1), zeros(cputype, 1, 1, 1))
+    ppoit = PPOIterator(env, pol, rl, ppodata, costvec, [true])
 
     # Compute gradient using backprop and apply gradient
     optiter = Knet.minimize(lossfun, ppoit, pol.optimizer)
@@ -61,9 +66,11 @@ function minimize!(rl::PPO, pol::Policy, env::Environment)
     newepcount = 0 # increases when the loss increases. Sample new trajectories after newepcount=3
     while next !== nothing
         (loss, state) = next
+        @assert(!isnan(loss), "Loss turned out NaN")
+        @assert(!isinf(loss), "Loss turned out Inf")
         if (loss>=oldloss)
             newepcount += 1
-            newepcount>3 && (ppoit.newepisode[1] = true; newepcount = 0; oldloss=Inf)
+            newepcount>10 && (ppoit.newepisode[1] = true; newepcount = 0; oldloss=Inf)
         else
             oldloss = loss
         end
@@ -73,11 +80,25 @@ function minimize!(rl::PPO, pol::Policy, env::Environment)
     return ppoit.costvec
 end
 
+function checkconsistency(rl::PPO, pol::Policy, env::Environment)
+    @assert pol.nX == env.nX
+    @assert pol.nU == env.nU
+    @assert pol.usegpu == rl.usegpu
+    @assert pol.atype == rl.atype
+    if isa(pol, RecurrentPolicy)
+        @assert pol.seqlength <= rl.Nsteps
+        mod(rl.Nsteps, pol.seqlength) != 0 && warn("Sequence length for the gradient is not a multiple of the number of timesteps. Last timesteps will not be used.")
+    end
+    return 0
+end
+
+
 ## Functions for a static policy
 # First iterate call, producting data that is fed into the forward pass
 function iterate(ppoit::PPOIterator{<:P}) where {P<:Policy}
-    getnewlossinput!(ppoit, 1)
-    return (ppoit.lossinput,), (1, 1)
+    getnewdata!(ppoit, 1)
+    lossinput = getbatch(ppoit.alldata, ppoit.rl.batchsize, ppoit.pol)
+    return (lossinput,), (1, 1)
 end
 
 # first state is the episode number, second state is a counter for ppo, reusing old data to produce yet another gradient
@@ -85,49 +106,51 @@ function iterate(ppoit::PPOIterator{<:P}, state::Tuple{Int, Int}) where {P<:Poli
 
     episN = state[1]
     incount = state[2]
-    # check if we should do another gradient with old data
-    if (ppoit.newepisode[1] == false && incount < 20)
-        print("Epis. $episN , $(incount+1) \u1b[K\r")
-        return (ppoit.lossinput,), (episN, incount+1)
+    # check if we should get new data
+    if (ppoit.newepisode[1] == false && incount < 1000)
+        print("Epis. $episN , $(incount+1)\u1b[K\r")
+        lossinput = getbatch(ppoit.alldata, ppoit.rl.batchsize, ppoit.pol)
+        return (lossinput,), (episN, incount+1)
     end
 
-    ## Pass on to next episode, update lossinput
+    ## Pass on to next episode, get new data
     newepisN = episN + 1
     newepisN > ppoit.rl.Nepisodes && return nothing
 
-    getnewlossinput!(ppoit, newepisN)
+    getnewdata!(ppoit, newepisN)
+    lossinput = getbatch(ppoit.alldata, ppoit.rl.batchsize, ppoit.pol)
 
-    return (ppoit.lossinput,), (newepisN, 1)
+    return (lossinput,), (newepisN, 1)
 end
 
 
 # Sample new trajectories, train value function etc etc
-function getnewlossinput!(ppoit::PPOIterator{<:StaticPolicy}, episN::Int)
+function getnewdata!(ppoit::PPOIterator{<:StaticPolicy}, episN::Int)
         # Get trajectories
-        print("Epis. $episN , 1 \r")
+        print("Epis. $episN , 1 \u1b[K")
         trajvec = gettraj(ppoit.pol, ppoit.env, ppoit.rl)
 
         # Transform the data into big tensors for faster GPU computation
         X, U, r = stacktraj(trajvec, ppoit.pol)
-        ppoit.lossinput.X = ppoit.rl.atype(X)
-        ppoit.lossinput.U = ppoit.rl.atype(U)
+        ppoit.alldata.X = X
+        ppoit.alldata.U = U
+
+        # Recompute the mean of the policy, given this input
+        ppoit.alldata.meanUold = typeof(U)( umean1(ppoit.pol, ppoit.pol.atype(X)) )
 
         # Train the value function
         valuetrain!(ppoit.rl, X, r)
+        print("Epis. $episN , 1 \u1b[K\r")
 
         # Compute the "generalised advantage estimation"
         A = gae(ppoit.rl, X, r)
-        ppoit.lossinput.A = ppoit.rl.atype(A)
+        ppoit.alldata.A = A
 
         # Carefull, overwriting r here
         applydiscount!(r, ppoit.rl.gamma)
         meancosts = mean(sum(r, dims = 3))
         ppoit.costvec[episN] = meancosts
         (mod(episN, ppoit.rl.printevery) == 0 || episN == 1) && println("Epis. $episN : mean costs $(meancosts) \u1b[K") # \u1b[K cleans the rest of the line
-
-        # Compute the meanU of the (old) policy
-        meanUold = ppoit.pol.umean(ppoit.lossinput.X)
-        ppoit.lossinput.meanUold = meanUold
 
         # Set other variables
         ppoit.newepisode[1] = false
@@ -136,39 +159,47 @@ function getnewlossinput!(ppoit::PPOIterator{<:StaticPolicy}, episN::Int)
 end
 
 # Sample new trajectories, train value function etc etc (version for Recurrent Policies)
-function getnewlossinput!(ppoit::PPOIterator{<:RecurrentPolicy}, episN::Int)
+function getnewdata!(ppoit::PPOIterator{<:RecurrentPolicy}, episN::Int)
     # Get trajectories
-    print("Epis. $episN , 1 \r")
+    print("Epis. $episN , 1 \u1b[K")
     trajvec = gettrajh(ppoit.pol, ppoit.env, ppoit.rl)
 
     # Transform the data into big tensors for faster GPU computation
-    X, H, U, r = stacktrajh(trajvec, ppoit.pol)
-    ppoit.lossinput.X = ppoit.rl.atype(X)
-    ppoit.lossinput.H = ppoit.rl.atype(H)
-    ppoit.lossinput.U = ppoit.rl.atype(U)
+    X, H, U, r = stacktrajh(trajvec, ppoit.pol, pol.seqlength)
+    ppoit.alldata.X = X
+    ppoit.alldata.U = U
+
+    # Recompute the mean of the policy, given this input (can be different from simulation because of seqlength and reset)
+    resetpol!(ppoit.pol)
+    ppoit.alldata.meanUold = typeof(U)( umean1(ppoit.pol, ppoit.pol.atype(X)) )
 
     # Train the value function
     valuetrain!(ppoit.rl, H, r)
+    print("Epis. $episN , 1 \u1b[K\r")
 
     # Compute the "generalised advantage estimation"
     A = gae(ppoit.rl, H, r)
-    ppoit.lossinput.A = ppoit.rl.atype(A)
+    ppoit.alldata.A = A
 
     # Carefull, overwriting r here
     applydiscount!(r, ppoit.rl.gamma)
     meancosts = mean(sum(r, dims = 3))
     ppoit.costvec[episN] = meancosts
-    (mod(episN, ppoit.rl.printevery) == 0 || episN == 1) && println("Epis. $episN : mean costs $(meancosts) \u1b[K")
-
-    # Compute the meanU of the (old) policy
-    resetpol!(ppoit.pol)
-    meanUold = umean1(ppoit.pol, ppoit.lossinput.X)
-    ppoit.lossinput.meanUold = meanUold
+    (mod(episN, ppoit.rl.printevery) == 0 || episN == 1) && println("\rEpis. $episN : mean costs $(meancosts) \u1b[K")
 
     # Set other variables
     ppoit.newepisode[1] = false
 
     return 1
+end
+
+function getbatch(ppodata::PPOdata, batchsize::Int, pol::Policy)
+     indices = randperm(size(ppodata.X, 2))[1:batchsize]
+     X = pol.atype(view(ppodata.X, :, indices, :))
+     U = pol.atype(view(ppodata.U, :, indices, :))
+     meanUold = pol.atype(view(ppodata.meanUold, :, indices, :))
+     A = pol.atype(view(ppodata.A, :, indices, :))
+     return PPOinput{pol.atype}(X, U, meanUold, A)
 end
 
 
@@ -184,5 +215,6 @@ function ppoloss!(pol::Policy, epsilon::T, ppoinput::PPOinput) where {T<:Number}
     probquotclipped = clipbool.*max.(one(T)-epsilon, probquot) .+ (1 .- clipbool) .* min.(one(T) + epsilon, probquot)
 
     # return the mean of the product, which is what is minimized here (usually called "L")
-    return mean(probquotclipped.*ppoinput.A)
+    loss = mean(probquotclipped.*ppoinput.A)
+    return loss
 end
