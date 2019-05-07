@@ -72,7 +72,7 @@ end
 
 
 # Evaluate a policy
-(pol::StaticPolicy)(x::AbstractVector) =  umean1(pol, x) .+ pol.std*randn(pol.nU)
+(pol::StaticPolicy)(x::AbstractVector) =  umean1(pol, x) .+ pol.std*randn(eltype(pol.atype), pol.nU)
 
 function (pol::RecurrentPolicy)(x::AbstractVector)
     umean, h = pol.umean(x)
