@@ -59,14 +59,14 @@ end
 # Function to convert a policy with memory on the gpu to a temporary cpu policy
 function cpupol(pol::RecurrentPolicy)
     umean = pol.converttocpu(pol.umean)
-    atype = Array{Float64} # TODO is this actually used?
+    atype = Array{eltype(pol.atype)} # TODO is this actually used?
     return RecurrentPolicy(pol.nX, pol.nH, pol.nU, pol.std, umean, atype, false, identity, nothing, pol.resetpolicy!)
 end
 
 
 function cpupol(pol::StaticPolicy)
     umean = pol.converttocpu(pol.umean)
-    atype = Array{Float64} # TODO is this actually used?
+    atype = Array{eltype(pol.atype)} # TODO is this actually used?
     return StaticPolicy(pol.nX, pol.nU, pol.std, umean, atype, false, identity, nothing)
 end
 
@@ -76,13 +76,13 @@ end
 
 function (pol::RecurrentPolicy)(x::AbstractVector)
     umean, h = pol.umean(x)
-    u = umean .+ pol.std*randn(pol.nU)
+    u = umean .+ pol.std*randn(eltype(pol.atype), pol.nU)
     return u
 end
 
 function samplepolh(pol::RecurrentPolicy, x)
     umean, h = pol.umean(x)
-    u = umean .+ pol.std*randn(pol.nU)
+    u = umean .+ pol.std*randn(eltype(pol.atype), pol.nU)
     return u, h
 end
 
