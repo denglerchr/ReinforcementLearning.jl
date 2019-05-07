@@ -118,7 +118,7 @@ function getnewlossinput!(expit::EXPIterator{<:StaticPolicy}, episN::Int)
         trajvec = gettraj(expit.pol, expit.env, expit.rl)
 
         # Transform the data into big tensors for faster GPU computation
-        X, U, r = stacktraj(trajvec, expit.pol)
+        X, U, r = stackXUr(trajvec, expit.pol)
         expit.lossinput.X = expit.rl.atype(X)
         expit.lossinput.U = expit.rl.atype(U)
 
@@ -154,7 +154,7 @@ function getnewlossinput!(expit::EXPIterator{<:RecurrentPolicy}, episN::Int)
     trajvec = gettrajh(expit.pol, expit.env, expit.rl)
 
     # Transform the data into big tensors for faster GPU computation
-    X, H, U, r = stacktrajh(trajvec, expit.pol)
+    X, H, U, r = stackXHUr(trajvec, expit.pol)
     expit.lossinput.X = expit.rl.atype(X)
     expit.lossinput.H = expit.rl.atype(H)
     expit.lossinput.U = expit.rl.atype(U)

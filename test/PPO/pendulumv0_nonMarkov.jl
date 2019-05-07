@@ -35,7 +35,7 @@ plot!(fig[3], sometraj[plotind].U')
 =#
 
 # Stack them into big tensors and reproduce the first plot
-X, H, U, r = ReinforcementLearning.stacktrajh(sometraj, pol, pol.seqlength)
+X, H, U, r = ReinforcementLearning.stackXHUr(sometraj, pol, pol.seqlength)
 
 #=
 fig = plot(layout = (3, 1))

@@ -96,7 +96,7 @@ end
 
 # Bring trajectories of same length into a 3d tensor shape, appropriate for calling neural networks
 # Functions with 2 arguments stack the whole trajectory, 3 arguments can be used for slicing sequences
-function stacktraj(trajvec::Vector{Trajectory}, pol::Policy)
+function stackXUr(trajvec::Vector{T}, pol::Policy) where {T<:Union{Trajectory, TrajectoryH}}
     cputype = eltype(pol.atype)
     X = Array{cputype}(undef, pol.nX, length(trajvec), size(trajvec[1].X, 2))
     U = Array{cputype}(undef, pol.nU, length(trajvec), size(trajvec[1].U, 2))
@@ -109,8 +109,7 @@ function stacktraj(trajvec::Vector{Trajectory}, pol::Policy)
     return X, U, r
 end
 
-
-function stacktrajh(trajvec::Vector{TrajectoryH}, pol::Policy)
+function stackXHUr(trajvec::Vector{TrajectoryH}, pol::Policy)
     cputype = eltype(pol.atype)
     X = Array{cputype}(undef, pol.nX, length(trajvec), size(trajvec[1].X, 2))
     H = Array{cputype}(undef, pol.nH, length(trajvec), size(trajvec[1].H, 2))
@@ -125,7 +124,7 @@ function stacktrajh(trajvec::Vector{TrajectoryH}, pol::Policy)
     return X, H, U, r
 end
 
-function stacktrajh(trajvec::Vector{TrajectoryH}, pol::Policy, seqlength::Int)
+function stackXHUr(trajvec::Vector{TrajectoryH}, pol::Policy, seqlength::Int)
     cputype = eltype(pol.atype)
     nseq = sum( floor(Int, size(traj.X, 2)/seqlength ) for traj in trajvec )
     X = Array{cputype}(undef, pol.nX, nseq, seqlength)
@@ -148,7 +147,6 @@ function stacktrajh(trajvec::Vector{TrajectoryH}, pol::Policy, seqlength::Int)
     return X, H, U, r
 end
 
-## Functions, stacking only some variables
 function stackXr(trajvec::Vector{T}, pol::Policy) where {T<:Union{Trajectory, TrajectoryH}}
     cputype = eltype(pol.atype)
     X = Array{cputype}(undef, pol.nX, length(trajvec), size(trajvec[1].X, 2))
@@ -169,6 +167,15 @@ function stackHr(trajvec::Vector{TrajectoryH}, pol::Policy)
         r[1, i, :] .= traj.r
     end
     return H, r
+end
+
+function stackr(trajvec::Vector{T}, pol::Policy) where {T<:Union{Trajectory, TrajectoryH}}
+    cputype = eltype(pol.atype)
+    r = Array{cputype}(undef, 1, length(trajvec), length(trajvec[1].r))
+    for (i, traj) in enumerate(trajvec)
+        r[1, i, :] .= traj.r
+    end
+    return r
 end
 
 function stackXU(trajvec::Vector{T}, pol::Policy, seqlength::Int) where {T<:Union{Trajectory, TrajectoryH}}

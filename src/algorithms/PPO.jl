@@ -131,7 +131,7 @@ function getnewdata!(ppoit::PPOIterator{<:StaticPolicy}, episN::Int)
         trajvec = gettraj(ppoit.pol, ppoit.env, ppoit.rl)
 
         # Transform the data into big tensors for faster GPU computation
-        X, U, r = stacktraj(trajvec, ppoit.pol)
+        X, U, r = stackXUr(trajvec, ppoit.pol)
         ppoit.alldata.X = X
         ppoit.alldata.U = U
 
