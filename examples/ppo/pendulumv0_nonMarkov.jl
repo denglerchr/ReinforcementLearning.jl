@@ -11,20 +11,20 @@ usegpu = (Knet.gpu() != -1)
 end
 @everywhere (u::UMEAN)(X) = (U = u.nn(X); return U, vec( u.nn.layers[1].h) )
 
-function convertumean(umeanin)
-    nn = RNN.rnnconvert(umeanin.nn; atype = Array{Float64})
+@everywhere function convertumean(umeanin)
+    nn = RNN.rnnconvert(umeanin.nn; atype = Array{Float32})
     return UMEAN(nn)
 end
 
 umean = UMEAN( Chain( (Knet.RNN(1, 16; rnnType = :gru, usegpu = usegpu, dataType = eltype(atype), h=0), Dense(16, 1, atype = atype, activation = identity) ) ) )
-pol = RecurrentPolicy(1, 16, 1, 0.02, umean, atype, usegpu, convertumean , Knet.SGD(;lr=0.001), 100, rnn->hiddentozero!(rnn.nn))
+pol = RecurrentPolicy(1, 16, 1, Float32(0.02), umean, atype, usegpu, convertumean , Knet.SGD(;lr=Float32(0.001)), 100, rnn->hiddentozero!(rnn.nn))
 
 
 # Define a value function, we use a neural network again
 valfunc = Chain( (Dense(16, 64; atype = atype, activation = tanh), Dense(64, 32; atype = atype, activation = tanh), Dense(32, 1, atype = atype, activation = identity) ) )
 
 # Set up the algorithm
-alg = PPO(1000, 500, 500, 0.99, 0.05, 512, 16, valfunc, atype, usegpu, Knet.SGD(), :MC, 0.05, 2, default_worker_pool())
+alg = PPO(1000, 500, 500, Float32(0.99), Float32(0.05), 512, 16, valfunc, atype, usegpu, Knet.SGD(), :MC, Float32(0.05), 2, default_worker_pool())
 
 # Start training
 all_costs = minimize!(alg, pol, env)
@@ -38,9 +38,9 @@ else
 end
 
 ReinforcementLearning.resetpol!(pol2)
-X = Array{Float64}(undef, 1, alg.Nsteps)
+X = Array{Float32}(undef, 1, alg.Nsteps)
 X[:, 1] .= env.resetenv!(env.dynamics)
-U = Array{Float64}(undef, 1, alg.Nsteps)
+U = Array{Float32}(undef, 1, alg.Nsteps)
 for i = 2:alg.Nsteps
     U[:, i-1] .= pol2(X[:, i-1])[1]
     X[:, i] .= env.dynamics(X[:, i-1], U[:, i-1])[1]
