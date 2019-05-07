@@ -3,8 +3,8 @@ using ReinforcementLearning, Plots, RNN, Knet
 # Load the pendulum problem
 
 include("../../examples/environments/pendulumv0_nonMarkov.jl")
-atype = Array{Float64} #KnetArray{Float32}
-usegpu = false #true
+atype = (Knet.gpu() == -1 ? Array{Float32} : KnetArray{Float32})
+usegpu = (Knet.gpu() != -1)
 
 @everywhere struct UMEAN # wrapper for returning also the hidden state
     nn::Chain
@@ -12,15 +12,16 @@ end
 @everywhere (u::UMEAN)(X) = (U = u.nn(X); return U, vec( u.nn.layers[1].h) )
 
 umean = UMEAN( Chain( (Knet.RNN(1, 16; rnnType = :gru, usegpu = usegpu, dataType = eltype(atype), h=0), Dense(16, 1, atype = atype, activation = identity) ) ) )
-pol = RecurrentPolicy(1, 16, 1, 0.2, umean, atype, usegpu, nothing, Knet.Adam(), rnn->hiddentozero!(rnn.nn))
+pol = RecurrentPolicy(1, 16, 1, 0.2, umean, atype, usegpu, nothing, Knet.Adam(), 100, rnn->hiddentozero!(rnn.nn))
 
 
 # Define a value function, we use a neural network again
 valfunc = Chain( (Dense(16, 32; atype = atype, activation = tanh), Dense(32, 16; atype = atype, activation = tanh), Dense(16, 1, atype = atype, activation = identity) ) )
 
 # Set up the algorithm
-alg = PPO(50, 500, 2, 0.99, 0.05, 16, valfunc, atype, usegpu, Knet.Adam(), :MC, 0.3, 2, default_worker_pool())
+alg = PPO(50, 500, 2, 0.99, 0.05, 50, 16, valfunc, atype, usegpu, Knet.Adam(), :MC, 0.3, 2, default_worker_pool())
 
+ReinforcementLearning.checkconsistency(alg, pol, env)
 
 # Create and plot some trajectories
 sometraj = ReinforcementLearning.gettrajh(pol, env::Environment, alg)
@@ -34,7 +35,7 @@ plot!(fig[3], sometraj[plotind].U')
 =#
 
 # Stack them into big tensors and reproduce the first plot
-X, H, U, r = ReinforcementLearning.stacktrajh(sometraj, pol)
+X, H, U, r = ReinforcementLearning.stacktrajh(sometraj, pol, pol.seqlength)
 
 #=
 fig = plot(layout = (3, 1))
@@ -60,6 +61,9 @@ plot(U[:, plotind, :]')
 plot!(meanUold[:, plotind, :]')
 =#
 
+ppodata = ReinforcementLearning.PPOdata(X, U, A)
+lossinput = ReinforcementLearning.getbatch(ppodata, 10, pol)
+
 # The same for now, would change after applying a gradient
 meanUnew = meanUold
 probquot = ReinforcementLearning.pdfgaussianquot(meanUnew, meanUold, alg.atype(U), pol.std, pol.std)
@@ -71,3 +75,5 @@ probquotclipped = clipbool.*max.(1.0-epsilon, probquot) .+ (1 .- clipbool) .* mi
 
 # return the mean of the product, which is what is minimized here (usually called "L")
 probquotclipped.*A
+
+ReinforcementLearning.ppoloss!(pol, epsilon, lossinput)
