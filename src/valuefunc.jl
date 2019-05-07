@@ -7,33 +7,33 @@ function valuetrain!(rl::RLAlgorithm, X, r)
     # Can be Monte-Carlo (:MC) or TD0 (:TD0)
     @assert(rl.nH == size(X, 1))
     vtarget = valuetarget(r, rl, X, Val(rl.valmethod))
-    
+
     # Flatten time dimension
-    X = reshape(X, size(X, 1), 1, size(X, 2)*size(X, 3))
-    vtarget = reshape(vtarget, size(vtarget, 1), 1, size(vtarget, 2)*size(vtarget, 3))
+    X = reshape(X, size(X, 1), size(X, 2)*size(X, 3))
+    vtarget = reshape(vtarget, size(vtarget, 1), size(vtarget, 2)*size(vtarget, 3))
 
     # Split datasets into training and testing #TODO
     percenttrain = 0.8
-    indices = randperm(size(X, 3))
+    indices = randperm(size(X, 2))
     trainindices = indices[1:ceil(Int, length(indices)*percenttrain)]
     testindices = indices[ceil(Int, length(indices)*percenttrain)+1:end]
-    Xtrain = rl.atype( X[:, :, trainindices] )
-    Xtest = rl.atype( X[:, :, testindices] )
-    Ytrain = rl.atype( vtarget[:, :, trainindices] )
-    Ytest = rl.atype( vtarget[:, :, testindices] )
+    Xtrain = rl.atype( X[:, trainindices] )
+    Xtest = rl.atype( X[:, testindices] )
+    Ytrain = rl.atype( vtarget[:, trainindices] )
+    Ytest = rl.atype( vtarget[:, testindices] )
 
     # Create minibatch iterator of the data
-    batchsize = max( ceil(Int, size(Xtrain, 3)/20), min( size(Xtrain, 3), 512 ) ) #TODO should this be a parameter of the algorithm, or is a standard value ok
+    batchsize = max( ceil(Int, size(Xtrain, 2)/10), min( size(Xtrain, 2), 512 ) ) #TODO should this be a parameter of the algorithm, or is a standard value ok
     data = Knet.minibatch(Xtrain, Ytrain, batchsize; shuffle = true)
 
     # Train the value function
     oldtesterror = Inf
     testerror = Inf
     trainerror = Inf
-    stopcount = 0 # increases each time error increases, stop after stopcount = 3
+    stopcount = 0 # increases each time error increases, stop after stopcount = 20
     epoch = 0
     loss(x, y) = mean(abs2, rl.valfunc(x)-y)
-    while (stopcount < 3 && epoch<200 && trainerror>1e-5 && testerror>1e-5) # Stop after max 200 epochs to avoid overfitting
+    while (stopcount < 20 && epoch<200 && trainerror>1e-5 && testerror>1e-5) # Stop after max 200 epochs to avoid overfitting
         # The main training step
         Knet.minimize!(loss, repeat(data, 5))
         epoch += 5
