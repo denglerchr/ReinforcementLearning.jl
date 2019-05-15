@@ -60,10 +60,10 @@ function minimize!(rl::PPO, pol::Policy, env::Environment)
     ppoit = PPOIterator(env, pol, rl, ppodata, costvec, [true])
 
     # Compute gradient using backprop and apply gradient
-    optiter = Knet.minimize(lossfun, ppoit, pol.optimizer)
+    optiter = Knet.minimize(lossfun, ppoit, pol.optimizer) # Why does this run one episode already?
     next = iterate(optiter)
     oldloss = Inf
-    newepcount = 0 # increases when the loss increases. Sample new trajectories after newepcount=3
+    newepcount = 0 # increases when the loss increases. Sample new trajectories after newepcount=20
     while next !== nothing
         (loss, state) = next
         @assert(!isnan(loss), "Loss turned out NaN")
@@ -73,6 +73,7 @@ function minimize!(rl::PPO, pol::Policy, env::Environment)
             newepcount>10 && (ppoit.newepisode[1] = true; newepcount = 0; oldloss=Inf)
         else
             oldloss = loss
+            newepcount = max(0, newepcount-1)
         end
         next = iterate(optiter, state)
     end
