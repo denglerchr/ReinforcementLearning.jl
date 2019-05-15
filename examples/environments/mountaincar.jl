@@ -1,4 +1,4 @@
-@everywhere function movecar(x::AbstractVector, u::Number)
+@everywhere function movecar(x::AbstractVector{T}, u::Number) where {T}
     out = similar(x, 2)
 
     # New velocity
@@ -21,10 +21,10 @@
         return out, 0.0;
     end
     #return out, 1.0
-    cost = 0.01-0.0025/3.0*( sin(3.0*out[1])-sin(3.0*0.5) )
+    cost = T( 0.01-0.0025/3.0*( sin(3.0*out[1])-sin(3.0*0.5) ) )
     return out, cost
 end
 
 @everywhere movecar(x::AbstractVector, u::AbstractVector) = movecar(x, u[1])
 
-env = Environment(1, 2, movecar, x->[-pi/6+randn()*0.01, 0.0])
+env = Environment(1, 2, movecar, x->Float32[-pi/6+randn()*0.01, 0.0])
