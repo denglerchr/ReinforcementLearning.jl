@@ -1,10 +1,11 @@
-using ReinforcementLearning, Plots, RNN, Knet
-
+using ReinforcementLearning, Plots, Knet
+@everywhere using RNN
 # Load the pendulum problem
 
 include("../../examples/environments/pendulumv0_nonMarkov.jl")
-atype = (Knet.gpu() == -1 ? Array{Float32} : KnetArray{Float32})
-usegpu = (Knet.gpu() != -1)
+atype = Array{Float32}#(Knet.gpu() == -1 ? Array{Float32} : KnetArray{Float32})
+cputype = eltype(atype)
+usegpu = false#(Knet.gpu() != -1)
 
 @everywhere struct UMEAN # wrapper for returning also the hidden state
     nn::Chain
@@ -19,12 +20,17 @@ pol = RecurrentPolicy(1, 16, 1, 0.2, umean, atype, usegpu, nothing, Knet.Adam(),
 valfunc = Chain( (Dense(16, 32; atype = atype, activation = tanh), Dense(32, 16; atype = atype, activation = tanh), Dense(16, 1, atype = atype, activation = identity) ) )
 
 # Set up the algorithm
-alg = PPO(50, 500, 2, 0.99, 0.05, 50, 16, valfunc, atype, usegpu, Knet.Adam(), :MC, 0.3, 2, default_worker_pool())
+rl = PPO(50, 500, 2, 0.99, 0.05, 50, 16, valfunc, atype, usegpu, Knet.Adam(), :MC, 0.3, 2, default_worker_pool())
 
-ReinforcementLearning.checkconsistency(alg, pol, env)
+ReinforcementLearning.checkconsistency(rl, pol, env)
 
 # Create and plot some trajectories
-sometraj = ReinforcementLearning.gettrajh(pol, env, alg)
+costvec = zeros(rl.Nepisodes)
+ppodata = ReinforcementLearning.PPOdata(zeros(cputype, 1, 1, 1), zeros(cputype, 1, 1, 1), zeros(cputype, 1, 1, 1), zeros(cputype, 1, 1, 1))
+ppoit = ReinforcementLearning.PPOIterator(env, pol, rl, ppodata, costvec, [true])
+iterate(ppoit)
+
+sometraj = ReinforcementLearning.gettrajh(pol, env, rl)
 
 plotind = rand(1:length(sometraj))
 #=
@@ -45,13 +51,13 @@ plot!(fig[3], U[:, plotind, :]')
 =#
 
 # train the Value function and have a look at the value targets
-ReinforcementLearning.valuetrain!(alg, H, r)
-vtarget = ReinforcementLearning.valuetarget(r, alg, H, Val(:MC))
-vtarget = ReinforcementLearning.valuetarget(r, alg, H, Val(:TD0))
+ReinforcementLearning.valuetrain!(rl, H, r)
+vtarget = ReinforcementLearning.valuetarget(r, rl, H, Val(:MC))
+vtarget = ReinforcementLearning.valuetarget(r, rl, H, Val(:TD0))
 
 # Generalised advantage estimation
-A = ReinforcementLearning.gae(alg, H, r)
-A = alg.atype(A)
+A = ReinforcementLearning.gae(rl, H, r)
+A = rl.atype(A)
 
 # Compute the mean of the old policy
 ReinforcementLearning.resetpol!(pol)
@@ -66,7 +72,7 @@ lossinput = ReinforcementLearning.getbatch(ppodata, 10, pol)
 
 # The same for now, would change after applying a gradient
 meanUnew = meanUold
-probquot = ReinforcementLearning.pdfgaussianquot(meanUnew, meanUold, alg.atype(U), pol.std, pol.std)
+probquot = ReinforcementLearning.pdfgaussianquot(meanUnew, meanUold, rl.atype(U), pol.std, pol.std)
 
 # Clipping
 epsilon = 0.05
