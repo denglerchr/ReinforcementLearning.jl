@@ -60,7 +60,7 @@ end
 function cpupol(pol::RecurrentPolicy)
     umean = pol.converttocpu(pol.umean)
     atype = Array{eltype(pol.atype)} # TODO is this actually used?
-    return RecurrentPolicy(pol.nX, pol.nH, pol.nU, pol.std, umean, atype, false, identity, nothing, pol.resetpolicy!)
+    return RecurrentPolicy(pol.nX, pol.nH, pol.nU, pol.std, umean, atype, false, identity, nothing, pol.seqlength, pol.resetpolicy!)
 end
 
 
@@ -72,17 +72,23 @@ end
 
 
 # Evaluate a policy
-(pol::StaticPolicy)(x::AbstractVector) =  umean1(pol, x) .+ pol.std*randn(eltype(pol.atype), pol.nU)
+function (pol::StaticPolicy)(x::AbstractVector) 
+    cputype = eltype(pol.atype)
+    u = umean1(pol, x) .+ cputype(pol.std)*randn(cputype, pol.nU)
+    return u
+end
 
 function (pol::RecurrentPolicy)(x::AbstractVector)
+    cputype = eltype(pol.atype)
     umean, h = pol.umean(x)
-    u = umean .+ pol.std*randn(eltype(pol.atype), pol.nU)
+    u = umean .+ cputype(pol.std)*randn(cputype, pol.nU)
     return u
 end
 
 function samplepolh(pol::RecurrentPolicy, x)
+    cputype = eltype(pol.atype)
     umean, h = pol.umean(x)
-    u = umean .+ pol.std*randn(eltype(pol.atype), pol.nU)
+    u = umean .+ cputype(pol.std)*randn(cputype, pol.nU)
     return u, h
 end
 
