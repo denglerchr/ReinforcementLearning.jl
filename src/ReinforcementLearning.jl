@@ -23,6 +23,8 @@ export StaticPolicy, RecurrentPolicy
 #
 include("RLAlgorithm.jl")
 include("Trajectory.jl")
+include("options.jl")
+export Options
 include("algorithms/Reinforce.jl")
 export Reinforce
 export minimize!

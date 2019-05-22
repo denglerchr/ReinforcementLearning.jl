@@ -15,7 +15,7 @@ struct TrajectoryH
 end
 
 # The main call, when producing multiple trajectories (use pmap for parallelization)
-function gettraj(pol::Policy, env::Environment, rl::PolicyGradientAlgorithm)
+function gettraj(pol::Policy, env::Environment, rl::PolicyGradientAlgorithm, workerpool::WorkerPool)
     if pol.usegpu
         poltemp = cpupol(pol)
         g = x -> sampletraj(poltemp, env, rl)
@@ -23,12 +23,12 @@ function gettraj(pol::Policy, env::Environment, rl::PolicyGradientAlgorithm)
         g = x -> sampletraj(pol, env, rl)
     end
 
-    bs = ceil(Int, rl.Ntraj/max(length(rl.workerpool), 1))
-    return pmap(g, rl.workerpool, 1:rl.Ntraj; batch_size = bs)
+    bs = ceil(Int, rl.Ntraj/max(length(workerpool), 1))
+    return pmap(g, workerpool, 1:rl.Ntraj; batch_size = bs)
 end
 
 
-function gettrajh(pol::RecurrentPolicy, env::Environment, rl::PolicyGradientAlgorithm)
+function gettrajh(pol::RecurrentPolicy, env::Environment, rl::PolicyGradientAlgorithm, workerpool::WorkerPool)
     if pol.usegpu
         poltemp = cpupol(pol)
         g = x -> sampletrajh(poltemp, env, rl)
@@ -36,8 +36,8 @@ function gettrajh(pol::RecurrentPolicy, env::Environment, rl::PolicyGradientAlgo
         g = x -> sampletrajh(pol, env, rl)
     end
 
-    bs = ceil(Int, rl.Ntraj/max(length(rl.workerpool), 1))
-    return pmap(g, rl.workerpool, 1:rl.Ntraj; batch_size = bs)
+    bs = ceil(Int, rl.Ntraj/max(length(workerpool), 1))
+    return pmap(g, workerpool, 1:rl.Ntraj; batch_size = bs)
 end
 
 

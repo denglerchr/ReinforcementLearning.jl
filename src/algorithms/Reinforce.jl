@@ -6,12 +6,7 @@ struct Reinforce <: PolicyGradientAlgorithm
     gamma::Number # Discount factor
 
     baseline::Symbol # Baseline used to reduce the variance of the gradient. Chose in {:none, :mean}
-
-    printevery::Int # Print loss every xx episodes
-    workerpool::WorkerPool
 end
-Reinforce(Ntraj::Int, Nsteps::Number, Nepisodes::Int, gamma::Number, baseline::Symbol) = Reinforce(Ntraj, Nsteps, Nepisodes, gamma, baseline, 1,  default_worker_pool())
-
 
 # This is used to generate data batches using the iterate function
 struct ReinforceIterator{P<:Policy}
@@ -19,10 +14,11 @@ struct ReinforceIterator{P<:Policy}
     pol::P
     rl::Reinforce
     costvec::Vector
+    options::Options
 end
 
 # Main function
-function minimize!(rl::Reinforce, pol::Policy, env::Environment)
+function minimize!(rl::Reinforce, pol::Policy, env::Environment, options::Options = Options())
     @assert pol.nX == env.nX
     @assert pol.nU == env.nU
 
@@ -30,7 +26,7 @@ function minimize!(rl::Reinforce, pol::Policy, env::Environment)
 
     # Define loss and batch generator
     loss(X, U, R) = logpdfr!(pol, X, U, R)
-    rlit = ReinforceIterator(env, pol, rl, costvec)
+    rlit = ReinforceIterator(env, pol, rl, costvec, options)
 
     # Compute gradient using backprop and apply gradient
     Knet.minimize!(loss, rlit, pol.optimizer)
@@ -44,10 +40,11 @@ end
 function iterate(rlit::ReinforceIterator)
     # Get trajectories
     print("\rEpis. 1\r")
-    trajvec = gettraj(rlit.pol, rlit.env, rlit.rl)
+    trajvec = gettraj(rlit.pol, rlit.env, rlit.rl, rlit.options.workerpool)
 
     # Transform the data into big tensors for faster GPU computation
     X, U, R = reinforceinputdata(trajvec, rlit.pol, rlit.rl.gamma, rlit.rl.baseline, true, 1, rlit.costvec)
+    Options_savepol(rlit.options, rlit.pol, rlit.costvec, 1) # eventually save the policy
 
     atype = rlit.pol.atype
     return (atype(X), atype(U), atype(R)), 1
@@ -59,11 +56,12 @@ function iterate(rlit::ReinforceIterator, episodeN::Int)
 
     # If not finished, get new trajectories etc.
     newepisN = episodeN+1
-    printbool = ( mod(newepisN, rlit.rl.printevery) == 0)
+    printbool = ( mod(newepisN, rlit.options.printevery) == 0)
 
     print("\rEpis. $newepisN")
-    trajvec = gettraj(rlit.pol, rlit.env, rlit.rl)
+    trajvec = gettraj(rlit.pol, rlit.env, rlit.rl, rlit.options.workerpool)
     X, U, R = reinforceinputdata(trajvec, rlit.pol, rlit.rl.gamma, rlit.rl.baseline, printbool, newepisN, rlit.costvec)
+    Options_savepol(rlit.options, rlit.pol, rlit.costvec, newepisN) # eventually save the policy
 
     atype = rlit.pol.atype
     return (atype(X), atype(U), atype(R)), newepisN

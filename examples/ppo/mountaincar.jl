@@ -14,10 +14,10 @@ pol = StaticPolicy(2, 1, cputype(1.0), umean, atype, usegpu, rnnconvert, Knet.Ad
 
 # Set up the algorithm
 valfunc = Chain( (Dense(2, 32; atype = atype, activation = tanh), Dense(32, 16; atype = atype, activation = tanh), Dense(16, 1, atype = atype, activation = identity) ) )
-alg = PPO(1000, 500, 10, cputype(0.99), cputype(0.1), 200, 2, valfunc, atype, usegpu, Knet.Adam(), :MC, cputype(0.05), 2, default_worker_pool())
-
+alg = PPO(1000, 500, 10, cputype(0.99), cputype(0.1), 200, 2, valfunc, atype, usegpu, Knet.Adam(), :MC, cputype(0.05))
+options = Options(5, 200, "mc.jld2",  default_worker_pool())
 # Run the algorithm
-all_costs = minimize!(alg, pol, env)
+all_costs = minimize!(alg, pol, env, options)
 
 # Take a look at the value function
 using Plots

@@ -5,7 +5,7 @@ include("../environments/chain.jl")
 
 # Create a static policy as a simple fully connected NN
 atype = Array{Float64}
- 
+
 @everywhere struct UMEAN # wrapper for returning also the hidden state
     nn::Chain
 end
@@ -15,10 +15,11 @@ umean = UMEAN( Chain( (Knet.RNN(2, 32; rnnType = :gru, usegpu = false, dataType 
 pol = RecurrentPolicy(2, 32, 1, 0.2, umean, atype, false, nothing, Knet.Adam(), rnn->hiddentozero!(rnn.nn))
 
 # Set up the algorithm
-alg = Reinforce(400, 300, 500, 0.995, :mean, 1, default_worker_pool())
+alg = Reinforce(400, 300, 500, 0.995, :mean)
+options = Options(2, 100, "chain.jld2",  default_worker_pool())
 
 # Run the algorithm
-all_costs = minimize!(alg, pol, env)
+all_costs = minimize!(alg, pol, env, options)
 
 # Test the policy
 X = Array{Float64}(undef, 2, alg.Nsteps)

@@ -19,10 +19,11 @@ pol = RecurrentPolicy(1, 16, 1, 0.2, umean, atype, usegpu, nothing, Knet.Adam(),
 valfunc = Chain( (Dense(16, 32; atype = atype, activation = tanh), Dense(32, 16; atype = atype, activation = tanh), Dense(16, 1, atype = atype, activation = identity) ) )
 
 # Set up the algorithm
-alg = Reinforce(400, 300, 500, 0.99, :mean, 10, default_worker_pool())
+alg = Reinforce(400, 300, 500, 0.99, :mean)
+options = Options(10, 100, "pend_nm.jld2",  default_worker_pool())
 
 # Run the algorithm
-all_costs = minimize!(alg, pol, env)
+all_costs = minimize!(alg, pol, env, options)
 
 # Test the policy
 X = Array{Float64}(undef, 1, alg.Nsteps)

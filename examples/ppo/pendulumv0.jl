@@ -14,10 +14,11 @@ pol = StaticPolicy(2, 1, Float32(0.2), umean, atype, true, x->RNN.rnnconvert(x; 
 valfunc = Chain( (Dense(2, 32; atype = atype, activation = tanh), Dense(32, 16; atype = atype, activation = tanh), Dense(16, 1, atype = atype, activation = identity) ) )
 
 # Set up the algorithm
-alg = PPO(1000, 500, 1000, Float32(0.99), Float32(0.05), 200, 2, valfunc, atype, true, Knet.Adam(), :TD0, Float32(0.05), 2, default_worker_pool())
+alg = PPO(1000, 500, 1000, Float32(0.99), Float32(0.05), 200, 2, valfunc, atype, true, Knet.Adam(), :TD0, Float32(0.05))
+options = Options(2, 100, "pend.jld2",  default_worker_pool())
 
 # Run the algorithm
-all_costs = minimize!(alg, pol, env)
+all_costs = minimize!(alg, pol, env, options)
 Knet.@save("pendulumv0.jld2", alg, pol)
 
 # Test the policy

@@ -24,10 +24,11 @@ pol = RecurrentPolicy(1, 16, 1, Float32(0.02), umean, atype, usegpu, convertumea
 valfunc = Chain( (Dense(16, 64; atype = atype, activation = tanh), Dense(64, 32; atype = atype, activation = tanh), Dense(32, 1, atype = atype, activation = identity) ) )
 
 # Set up the algorithm
-alg = PPO(1000, 500, 500, Float32(0.99), Float32(0.05), 512, 16, valfunc, atype, usegpu, Knet.SGD(), :MC, Float32(0.05), 2, default_worker_pool())
+alg = PPO(1000, 500, 500, Float32(0.99), Float32(0.05), 512, 16, valfunc, atype, usegpu, Knet.SGD(), :MC, Float32(0.05))
+options = Options(2, 100, "pend_nm.jld2",  default_worker_pool())
 
 # Start training
-all_costs = minimize!(alg, pol, env)
+all_costs = minimize!(alg, pol, env, options)
 
 
 

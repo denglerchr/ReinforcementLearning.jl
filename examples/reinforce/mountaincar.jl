@@ -7,13 +7,14 @@ include("../environments/mountaincar.jl")
 atype = Array{Float64}
 umean = Chain( (Dense(2, 16; atype = atype, activation = tanh), Dense(16, 1, atype = atype, activation = identity) ) )
 
-pol = StaticPolicy(2, 1, 0.1, x->umean(x), atype, false, nothing, Knet.Adam())
+pol = StaticPolicy(2, 1, 0.1, umean, atype, false, nothing, Knet.Adam())
 
 # Set up the algorithm
-alg = Reinforce(10, 500, 500, 1.0, :mean, 50, default_worker_pool())
+alg = Reinforce(50, 1000, 500, 1.0, :mean)
+options = Options(50, 200, "mc.jld2",  default_worker_pool())
 
 # Run the algorithm
-all_costs = minimize!(alg, pol, env)
+all_costs = minimize!(alg, pol, env, options)
 
 # Test the policy
 X = Array{Float64}(undef, 2, alg.Nsteps)

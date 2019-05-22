@@ -10,10 +10,11 @@ umean = Chain( (Dense(2, 32; atype = atype, activation = tanh), Dense(32, 16; at
 pol = StaticPolicy(2, 1, 0.2, x->umean(x), atype, false, nothing, Knet.Adam())
 
 # Set up the algorithm
-alg = Reinforce(400, 500, 1000, 0.99, :mean, 50, default_worker_pool())
+alg = Reinforce(400, 500, 1000, 0.99, :mean)
+options = Options(50, 100, "pend.jld2",  default_worker_pool())
 
 # Run the algorithm
-all_costs = minimize!(alg, pol, env)
+all_costs = minimize!(alg, pol, env, options)
 
 # Test the policy
 X = Array{Float64}(undef, 2, alg.Nsteps)

@@ -15,9 +15,6 @@ struct PPO <: PolicyGradientAlgorithm
     optimizer  # The optimizer for the Advantage function, e.g. Knet.Adam()
     valmethod::Symbol # Defines how the value function targets are computed. Can be :MC or :TD0.
     lambda::Number # For the generalised advantage estimation (gae), TD-lambda
-
-    printevery::Int # Print loss every xx episodes
-    workerpool::WorkerPool
 end
 
 
@@ -45,11 +42,13 @@ struct PPOIterator{P<:Policy}
     alldata::PPOdata # save all data of one iteration
     costvec::Vector{Float64}
     newepisode::Vector{Bool}
+    printevery::Int # Print loss every xx episodes
+    workerpool::WorkerPool
 end
 
 
 # The main call, starting the rl optimization
-function minimize!(rl::PPO, pol::Policy, env::Environment)
+function minimize!(rl::PPO, pol::Policy, env::Environment, options::Options = Options())
     checkconsistency(rl, pol, env)
     cputype = eltype(pol.atype)
     costvec = [NaN for i = 1:rl.Nepisodes]
@@ -57,7 +56,7 @@ function minimize!(rl::PPO, pol::Policy, env::Environment)
     # Define loss and batch generator
     lossfun(ppoinput) = ppoloss!(pol, rl.epsilon, ppoinput)
     ppodata = PPOdata(zeros(cputype, 1, 1, 1), zeros(cputype, 1, 1, 1), zeros(cputype, 1, 1, 1), zeros(cputype, 1, 1, 1))
-    ppoit = PPOIterator(env, pol, rl, ppodata, costvec, [true])
+    ppoit = PPOIterator(env, pol, rl, ppodata, costvec, [true], options.printevery, options.workerpool)
 
     # Compute gradient using backprop and apply gradient
     optiter = Knet.minimize(lossfun, ppoit, pol.optimizer) # Why does this run one episode already?
@@ -68,13 +67,15 @@ function minimize!(rl::PPO, pol::Policy, env::Environment)
         (loss, state) = next
         @assert(!isnan(loss), "Loss turned out NaN")
         @assert(!isinf(loss), "Loss turned out Inf")
+        (state[2] == 1) && Options_savepol(options, pol, costvec, state[1]) # Possibly save policy
         if (loss>=oldloss)
-            newepcount += 1
-            newepcount>10 && (ppoit.newepisode[1] = true; newepcount = 0; oldloss=Inf)
+            newepcount += 2
+            newepcount>30 && (ppoit.newepisode[1] = true; newepcount = 0; oldloss=Inf)
         else
             oldloss = loss
             newepcount = max(0, newepcount-1)
         end
+
         next = iterate(optiter, state)
     end
 
@@ -129,7 +130,7 @@ end
 function getnewdata!(ppoit::PPOIterator{<:StaticPolicy}, episN::Int)
         # Get trajectories
         print("Epis. $episN , 1 \u1b[K")
-        trajvec = gettraj(ppoit.pol, ppoit.env, ppoit.rl)
+        trajvec = gettraj(ppoit.pol, ppoit.env, ppoit.rl, ppoit.workerpool)
 
         # Transform the data into big tensors for faster GPU computation
         X, U, r = stackXUr(trajvec, ppoit.pol)
@@ -151,7 +152,7 @@ function getnewdata!(ppoit::PPOIterator{<:StaticPolicy}, episN::Int)
         applydiscount!(r, ppoit.rl.gamma)
         meancosts = mean(sum(r, dims = 3))
         ppoit.costvec[episN] = meancosts
-        (mod(episN, ppoit.rl.printevery) == 0 || episN == 1) && println("Epis. $episN : mean costs $(meancosts) \u1b[K") # \u1b[K cleans the rest of the line
+        (mod(episN, ppoit.printevery) == 0 || episN == 1) && println("Epis. $episN : mean costs $(meancosts) \u1b[K") # \u1b[K cleans the rest of the line
 
         # Set other variables
         ppoit.newepisode[1] = false
@@ -163,7 +164,7 @@ end
 function getnewdata!(ppoit::PPOIterator{<:RecurrentPolicy}, episN::Int)
     # Get trajectories
     print("Epis. $episN , 1 \u1b[K")
-    trajvec = gettrajh(ppoit.pol, ppoit.env, ppoit.rl)
+    trajvec = gettrajh(ppoit.pol, ppoit.env, ppoit.rl, ppoit.workerpool)
 
     # Transform the data into big tensors for faster GPU computation
     # Also cut X and U in shorter sequences
@@ -189,7 +190,7 @@ function getnewdata!(ppoit::PPOIterator{<:RecurrentPolicy}, episN::Int)
     applydiscount!(r, ppoit.rl.gamma)
     meancosts = mean(sum(r, dims = 3))
     ppoit.costvec[episN] = meancosts
-    (mod(episN, ppoit.rl.printevery) == 0 || episN == 1) && println("\rEpis. $episN : mean costs $(meancosts) \u1b[K")
+    (mod(episN, ppoit.printevery) == 0 || episN == 1) && println("\rEpis. $episN : mean costs $(meancosts) \u1b[K")
 
     # Set other variables
     ppoit.newepisode[1] = false

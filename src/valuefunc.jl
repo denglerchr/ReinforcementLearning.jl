@@ -33,7 +33,7 @@ function valuetrain!(rl::RLAlgorithm, X, r)
     stopcount = 0 # increases if error increases, stop after stopcount = 20
     epoch = 0
     loss(x, y) = mean(abs2, rl.valfunc(x)-y)
-    while (stopcount < 20 && epoch<200 && trainerror>1e-5 && testerror>1e-5) # Stop after max 200 epochs to avoid overfitting
+    while (stopcount < 30 && epoch<2000 && trainerror>1e-5 && testerror>1e-5) # Stop after max 2000 epochs to avoid overfitting
         # The main training step
         Knet.minimize!(loss, repeat(data, 5))
         epoch += 5
@@ -44,7 +44,7 @@ function valuetrain!(rl::RLAlgorithm, X, r)
         print("\t\tTraining value function: epoch $epoch: trainerror: $trainerror, testerror: $testerror\u1b[K\r")
 
         # Evaluate stopping criteria
-        testerror>=oldtesterror ? (stopcount += 1) : (stopcount = max(0, stopcount-1)) # stop if testerror increasing
+        testerror>=oldtesterror ? (stopcount += 2) : (stopcount = max(0, stopcount-1)) # stop if testerror increasing
         oldtesterror = testerror
     end
     return 1
