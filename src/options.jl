@@ -36,7 +36,7 @@ function Options_savepol(options::Options, pol::Policy, costvec::AbstractVector,
     # Save if episN is a multiple of saveevery
     if mod(episN, options.saveevery) == 0
         Knet.jldopen(options.filename, "a+") do file
-            file[string(episN)*"/pol"] = pol
+            file[string(episN)*"/cpupol"] = cpupol(pol)
             file[string(episN)*"/cost"] = costvec[episN]
         end
         return 1
