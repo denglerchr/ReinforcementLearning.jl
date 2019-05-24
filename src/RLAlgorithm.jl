@@ -20,7 +20,6 @@ function logpdfgaussian(meanU, U, std::Number)
     c = -log(pi*std^2*2)*N/2
 
     # Mean term (3d tensor)
-    # Cannot use sum(x->x^2, ..., dims = 1) yet, as AutoGrad doesn support it
     Temp = sum( abs2.(U.-meanU) , dims=1)
     logpdf = c .- Temp ./std^2 ./2
 
