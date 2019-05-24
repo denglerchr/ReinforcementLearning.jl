@@ -12,19 +12,19 @@ function valuetrain!(rl::RLAlgorithm, X, r)
     X = reshape(X, size(X, 1), size(X, 2)*size(X, 3))
     vtarget = reshape(vtarget, size(vtarget, 1), size(vtarget, 2)*size(vtarget, 3))
 
-    # Split datasets into training and testing #TODO
+    # Split datasets into training and testing
     percenttrain = 0.8
     indices = randperm(size(X, 2))
     trainindices = indices[1:ceil(Int, length(indices)*percenttrain)]
     testindices = indices[ceil(Int, length(indices)*percenttrain)+1:end]
-    Xtrain = rl.atype( X[:, trainindices] )
+    Xtrain = X[:, trainindices]
+    Ytrain = vtarget[:, trainindices]
     Xtest = rl.atype( X[:, testindices] )
-    Ytrain = rl.atype( vtarget[:, trainindices] )
     Ytest = rl.atype( vtarget[:, testindices] )
 
-    # Create minibatch iterator of the data
-    batchsize = max( ceil(Int, size(Xtrain, 2)/10), min( size(Xtrain, 2), 512 ) ) #TODO should this be a parameter of the algorithm, or is a standard value ok
-    data = Knet.minibatch(Xtrain, Ytrain, batchsize; shuffle = true)
+    # Create minibatch (batchsize between 256 and 2048 Tuples) and iterator for training
+    batchsize = max( min( size(Xtrain, 2), 256 ), min(ceil(Int, size(Xtrain, 2)/30), 2048) )
+    data = Knet.minibatch(Xtrain, Ytrain, batchsize; shuffle = true, xtype = rl.atype, ytype = rl.atype)
 
     # Train the value function
     oldtesterror = Inf
@@ -33,18 +33,29 @@ function valuetrain!(rl::RLAlgorithm, X, r)
     stopcount = 0 # increases if error increases, stop after stopcount = 20
     epoch = 0
     loss(x, y) = mean(abs2, rl.valfunc(x)-y)
-    while (stopcount < 30 && epoch<2000 && trainerror>1e-5 && testerror>1e-5) # Stop after max 2000 epochs to avoid overfitting
-        # The main training step
-        Knet.minimize!(loss, repeat(data, 5))
+    optiter = Knet.minimize(loss, data)
+    while (stopcount < 30 && epoch<1000 && trainerror>1e-5 && testerror>1e-5) # Stop after max 2000 epochs to avoid overfitting
+        # The main training steps
+        sumtrainloss = 0.0 # variables needed to compute the mean trainig error
+        trainlosscount = 0 # variables needed to compute the mean trainig error
+        for j = 1:5 # do 5 epochs
+            next = iterate(optiter)
+            while next !== nothing
+                (temploss, state) = next
+                trainlosscount += 1
+                sumtrainloss += temploss
+                next = iterate(optiter, state)
+            end
+        end
+        trainerror = sumtrainloss/trainlosscount
         epoch += 5
 
-        # Print progress
-        trainerror = loss(Xtrain, Ytrain)
+        # Compute testerror and Print progress
         testerror = loss(Xtest, Ytest)
         print("\t\tTraining value function: epoch $epoch: trainerror: $trainerror, testerror: $testerror\u1b[K\r")
 
         # Evaluate stopping criteria
-        testerror>=oldtesterror ? (stopcount += 2) : (stopcount = max(0, stopcount-1)) # stop if testerror increasing
+        testerror>=oldtesterror ? (stopcount += 2) : (stopcount = max(0, stopcount-1)) # increase "stopcount" if testerror increasing
         oldtesterror = testerror
     end
     return 1
