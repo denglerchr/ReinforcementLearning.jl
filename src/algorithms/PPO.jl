@@ -49,7 +49,7 @@ end
 
 # The main call, starting the rl optimization
 function minimize!(rl::PPO, pol::Policy, env::Environment, options::Options = Options())
-    checkconsistency(rl, pol, env)
+    checkconsistency(rl, pol, env, options)
     cputype = eltype(pol.atype)
     costvec = [NaN for i = 1:rl.Nepisodes]
 
@@ -82,7 +82,7 @@ function minimize!(rl::PPO, pol::Policy, env::Environment, options::Options = Op
     return ppoit.costvec
 end
 
-function checkconsistency(rl::PPO, pol::Policy, env::Environment)
+function checkconsistency(rl::PPO, pol::Policy, env::Environment, options::Options)
     @assert pol.nX == env.nX
     @assert pol.nU == env.nU
     @assert pol.usegpu == rl.usegpu
@@ -91,6 +91,10 @@ function checkconsistency(rl::PPO, pol::Policy, env::Environment)
         @assert pol.seqlength <= rl.Nsteps
         mod(rl.Nsteps, pol.seqlength) != 0 && warn("Sequence length for the gradient is not a multiple of the number of timesteps. Last timesteps will not be used.")
     end
+
+    # Check if filename is ok
+    isfile(options.filename) && error("File $(options.filename) already exists, please delete or move it")
+    # TODO can i check a priori if the file can be created?
     return 0
 end
 
