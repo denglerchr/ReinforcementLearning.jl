@@ -32,7 +32,6 @@ struct RecurrentPolicy{T} <: Policy
     resetpolicy!::Function
 end
 
-
 """
 A static policy, which means that it samples u_t each time from the same distribution when receiving the same input x_t.
 Should not contain a hidden state.
@@ -72,7 +71,7 @@ end
 
 
 # Evaluate a policy
-function (pol::StaticPolicy)(x::AbstractVector) 
+function (pol::StaticPolicy)(x::AbstractVector)
     cputype = eltype(pol.atype)
     u = umean1(pol, x) .+ cputype(pol.std)*randn(cputype, pol.nU)
     return u

@@ -1,3 +1,4 @@
+# Pendulum WITHOUT a cart, same dynamics as in the openAI gym
 # Non Makrov version of the pendulum problem. Only the angle can be seen, not the angluar velocity.
 @everywhere struct Pendulum{T}
     state::AbstractVector{T}

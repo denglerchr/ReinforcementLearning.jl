@@ -18,9 +18,9 @@ function gae(rl::PolicyGradientAlgorithm, X, r)
     discount = rl.gamma*rl.lambda
 
     for T = nsteps-1:-1:1
-        delta_V1 .= delta_V
         delta_V .= r[1, :, T] .+ rl.gamma.*V[1, :, T+1] .- V[1, :, T]
         A[1, :, T] .= delta_V .+ discount.*delta_V1
+        delta_V1 .= A[1, :, T]
     end
 
     return A

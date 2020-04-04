@@ -32,7 +32,7 @@ function pdfgaussianquot(meanU1, meanU2, U, std1, std2)
     return exp.(logpdfgaussian(meanU1, U, std1) .- logpdfgaussian(meanU2, U, std2))
 end
 
-# Return p1(U)/p2(U) for Gaussian distributions, but cut off to max_val (avoid Inf)
+# Return p1(U)/p2(U) for Gaussian distributions, but cut off to max_val (to avoid Inf)
 function pdfgaussianquot_limited(meanU1, meanU2, U, std1::Number, std2::Number, max_val::Number)
     logpdf = min.( log(max_val), logpdfgaussian(meanU1, U, std1) .- logpdfgaussian(meanU2, U, std2) )
     return exp.(logpdf)

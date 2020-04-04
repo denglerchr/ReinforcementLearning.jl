@@ -23,18 +23,18 @@ function valuetrain!(rl::RLAlgorithm, X, r)
     Ytest = rl.atype( vtarget[:, testindices] )
 
     # Create minibatch (batchsize between 256 and 2048 Tuples) and iterator for training
-    batchsize = max( min( size(Xtrain, 2), 256 ), min(ceil(Int, size(Xtrain, 2)/30), 2048) )
+    batchsize = max( min( size(Xtrain, 2), 256 ), min(ceil(Int, size(Xtrain, 2)/30), 8192) )
     data = Knet.minibatch(Xtrain, Ytrain, batchsize; shuffle = true, xtype = rl.atype, ytype = rl.atype)
 
     # Train the value function
     oldtesterror = Inf
     testerror = Inf
     trainerror = Inf
-    stopcount = 0 # increases if error increases, stop after stopcount = 20
+    stopcount = 0 # increases if error increases, stop after stopcount passes threshold
     epoch = 0
     loss(x, y) = mean(abs2, rl.valfunc(x)-y)
     optiter = Knet.minimize(loss, data)
-    while (stopcount < 30 && epoch<1000 && trainerror>1e-5 && testerror>1e-5) # Stop after max 2000 epochs to avoid overfitting
+    while (stopcount < 10 && epoch<1000 && trainerror>1e-5 && testerror>1e-5) # Stop after max 2000 epochs to avoid overfitting
         # The main training steps
         sumtrainloss = 0.0 # variables needed to compute the mean trainig error
         trainlosscount = 0 # variables needed to compute the mean trainig error

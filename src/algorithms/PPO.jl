@@ -89,7 +89,7 @@ function checkconsistency(rl::PPO, pol::Policy, env::Environment, options::Optio
     @assert pol.atype == rl.atype
     if isa(pol, RecurrentPolicy)
         @assert pol.seqlength <= rl.Nsteps
-        mod(rl.Nsteps, pol.seqlength) != 0 && warn("Sequence length for the gradient is not a multiple of the number of timesteps. Last timesteps will not be used.")
+        mod(rl.Nsteps, pol.seqlength) != 0 && @warn("Sequence length for the gradient is not a multiple of the number of timesteps. Last timesteps will not be used.")
     end
 
     # Check if filename is ok
