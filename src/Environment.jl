@@ -6,7 +6,7 @@ Fields are:
 * nU: The lentgh of the action vector/number of discrete actions
 * nX: The lentgh of the state vector/number of discrete states
 * dynamics: Callable object, defining the environments behavior.
-* resetenv!: A function which return an itial state and eventually resets hidden states of the environment.
+* resetenv!: A function which return an initial state and eventually resets hidden states of the environment.
 """
 struct Environment{T}
     nU::Int # Dimension of the action vector/Number of discrete actions

@@ -4,17 +4,17 @@ using ReinforcementLearning, Knet, RNN
 include("../environments/pendwithcart.jl")
 
 # Create a static policy as a simple fully connected NN
-usegpu = (Knet.gpu() != -1)
+usegpu = false#(Knet.gpu() != -1)
 atype = (usegpu ? KnetArray{Float32} : Array{Float32})
 umean = Chain( (Dense(4, 16; atype = atype, activation = tanh), Dense(16, 8; atype = atype, activation = tanh), Dense(8, 1, atype = atype, activation = identity) ) )
 
-pol = StaticPolicy(4, 1, Float32(2.0), umean, atype, true, x->RNN.rnnconvert(x; atype = Array{Float32}), Knet.Adam())
+pol = StaticPolicy(4, 1, Float32(1.0), umean, atype, true, x->RNN.rnnconvert(x; atype = Array{Float32}), Knet.Adam())
 
 # Define a value function, we use a neural network again
 valfunc = Chain( (Dense(4, 16; atype = atype, activation = tanh), Dense(16, 8; atype = atype, activation = tanh), Dense(8, 1, atype = atype, activation = identity) ) )
 
 # Set up the algorithm
-alg = PPO(500, 100, 200, Float32(0.999), Float32(0.05), 200, 4, valfunc, atype, true, Knet.Adam(), :TD0, Float32(0.5))
+alg = PPO(500, 100, 300, Float32(0.999), Float32(0.1), 200, 4, valfunc, atype, true, Knet.Adam(), :TD0, Float32(0.5))
 options = Options(2, -1, "pend.jld2",  default_worker_pool())
 
 # Run the algorithm

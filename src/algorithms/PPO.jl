@@ -19,7 +19,7 @@ end
 
 
 # Contains one data batch, used to compute the ppo loss
-struct PPOinput{T}
+struct PPOInput{T}
     X::T
     U::T
     meanUold::T
@@ -27,7 +27,7 @@ struct PPOinput{T}
 end
 
 # Contains trajectory data as tensors (always on the cpu)
-mutable struct PPOdata{T}
+mutable struct PPOData{T}
     X::T
     U::T
     meanUold::T
@@ -39,7 +39,7 @@ struct PPOIterator{P<:Policy}
     env::Environment
     pol::P
     rl::PPO
-    alldata::PPOdata # save all data of one iteration
+    alldata::PPOData # save all data of one iteration
     costvec::Vector{Float64}
     newepisode::Vector{Bool}
     printevery::Int # Print loss every xx episodes
@@ -55,7 +55,7 @@ function minimize!(rl::PPO, pol::Policy, env::Environment, options::Options = Op
 
     # Define loss and batch generator
     lossfun(ppoinput) = ppoloss!(pol, rl.epsilon, ppoinput)
-    ppodata = PPOdata(zeros(cputype, 1, 1, 1), zeros(cputype, 1, 1, 1), zeros(cputype, 1, 1, 1), zeros(cputype, 1, 1, 1))
+    ppodata = PPOData(zeros(cputype, 1, 1, 1), zeros(cputype, 1, 1, 1), zeros(cputype, 1, 1, 1), zeros(cputype, 1, 1, 1))
     ppoit = PPOIterator(env, pol, rl, ppodata, costvec, [true], options.printevery, options.workerpool)
 
     # Compute gradient using backprop and apply gradient
@@ -87,6 +87,7 @@ function checkconsistency(rl::PPO, pol::Policy, env::Environment, options::Optio
     @assert pol.nU == env.nU
     @assert pol.usegpu == rl.usegpu
     @assert pol.atype == rl.atype
+    @assert rl.batchsize <= rl.Ntraj
     if isa(pol, RecurrentPolicy)
         @assert pol.seqlength <= rl.Nsteps
         mod(rl.Nsteps, pol.seqlength) != 0 && @warn("Sequence length for the gradient is not a multiple of the number of timesteps. Last timesteps will not be used.")
@@ -202,22 +203,22 @@ function getnewdata!(ppoit::PPOIterator{<:RecurrentPolicy}, episN::Int)
     return 1
 end
 
-function getbatch(ppodata::PPOdata, batchsize::Int, pol::Policy)
+function getbatch(ppodata::PPOData, batchsize::Int, pol::Policy)
      indices = randperm(size(ppodata.X, 2))[1:batchsize]
      X = pol.atype(view(ppodata.X, :, indices, :))
      U = pol.atype(view(ppodata.U, :, indices, :))
      meanUold = pol.atype(view(ppodata.meanUold, :, indices, :))
      A = pol.atype(view(ppodata.A, :, indices, :))
-     return PPOinput{pol.atype}(X, U, meanUold, A)
+     return PPOInput{pol.atype}(X, U, meanUold, A)
 end
 
 
 # The loss function of PPO
-function ppoloss!(pol::Policy, epsilon::T, ppoinput::PPOinput) where {T<:Number}
+function ppoloss!(pol::Policy, epsilon::T, ppoinput::PPOInput) where {T<:Number}
     # Compute the quotient of probabilities pol_new(U)/pol_old(U)
     resetpol!(pol)
     meanUnew = umean1(pol, ppoinput.X)
-    probquot = pdfgaussianquot_limited(meanUnew, ppoinput.meanUold, ppoinput.U, pol.std, pol.std, T(1e4))
+    probquot = pdfgaussianquot_limited(meanUnew, ppoinput.meanUold, ppoinput.U, pol.std, pol.std, T(1e4)) # p1(U)/p2(U)
 
     # Set gradient to zero for quotient too far from 1
     clipbool = (ppoinput.A .> 0) # 1 where probquot should be clipped at 1-epsilon, 0 if clipping at 1+epsilon

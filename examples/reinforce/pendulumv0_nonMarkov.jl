@@ -14,10 +14,6 @@ end
 umean = UMEAN( Chain( (Knet.RNN(1, 16; rnnType = :gru, usegpu = usegpu, dataType = eltype(atype), h=0), Dense(16, 1, atype = atype, activation = identity) ) ) )
 pol = RecurrentPolicy(1, 16, 1, 0.2, umean, atype, usegpu, nothing, Knet.Adam(), 100, rnn->hiddentozero!(rnn.nn))
 
-
-# Define a value function, we use a neural network again
-valfunc = Chain( (Dense(16, 32; atype = atype, activation = tanh), Dense(32, 16; atype = atype, activation = tanh), Dense(16, 1, atype = atype, activation = identity) ) )
-
 # Set up the algorithm
 alg = Reinforce(400, 300, 500, 0.99, :mean)
 options = Options(10, 100, "pend_nm.jld2",  default_worker_pool())

@@ -3,7 +3,7 @@
 # Load the environment "env"
 include("../environments/pendulumv0_nonMarkov.jl")
 
-# Create a static policy as a simple fully connected NN
+# Create a policy as a simple fully connected NN
 atype = (Knet.gpu() == -1 ? Array{Float32} : KnetArray{Float32})
 usegpu = (Knet.gpu() != -1)
 @everywhere struct UMEAN # wrapper for returning also the hidden state

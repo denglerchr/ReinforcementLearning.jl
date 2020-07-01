@@ -34,6 +34,9 @@ include("valuefunc.jl")
 include("gae.jl")
 export PPO
 
+include("algorithms/PPOEpopt.jl")
+export PPOEpopt
+
 include("algorithms/Experimental.jl")
 export Experimental
 

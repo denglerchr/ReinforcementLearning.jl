@@ -19,8 +19,7 @@ end
 
 # Main function
 function minimize!(rl::Reinforce, pol::Policy, env::Environment, options::Options = Options())
-    @assert pol.nX == env.nX
-    @assert pol.nU == env.nU
+    checkconsistency(rl, pol, env, options)
 
     costvec = [NaN for i = 1:rl.Nepisodes]
 
@@ -34,6 +33,19 @@ function minimize!(rl::Reinforce, pol::Policy, env::Environment, options::Option
     return costvec
 end
 
+function checkconsistency(rl::Reinforce, pol::Policy, env::Environment, options::Options)
+    @assert pol.nX == env.nX
+    @assert pol.nU == env.nU
+
+    if isa(pol, RecurrentPolicy)
+        @assert pol.seqlength <= rl.Nsteps
+        mod(rl.Nsteps, pol.seqlength) != 0 && @warn("Sequence length for the gradient is not a multiple of the number of timesteps. Last timesteps will not be used.")
+    end
+
+    # Check if filename is ok
+    isfile(options.filename) && error("File $(options.filename) already exists, please delete or move it")
+    return 0
+end
 
 ## Iterator function, used to generate the data batches
 # iterate to create one batch of data

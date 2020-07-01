@@ -1,6 +1,5 @@
 # Pendulum with cart, 0 state at bottom
-@everywhere using PendulumDyn
-import PendulumDyn.Pendulum
+@everywhere import PendulumDyn
 
 @everywhere function rl_pend(x, u)
     pend = PendulumDyn.Pendulum(Float32)
